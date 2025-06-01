@@ -2,6 +2,7 @@
   "name": "event-staff-frontend",
   "version": "1.0.0",
   "private": true,
+  "proxy":"http://localhoast:3001",
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",

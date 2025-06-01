@@ -6,6 +6,17 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 const { handleValidationErrors, isValidGermanPhoneNumber, isValidPostalCode, isValidBirthDate } = require('../middleware/validation');
 
+// TEST ROUTE - Am Anfang der Datei nach den Imports
+router.get('/test', (req, res) => {
+  const mockDB = require('../mockDatabase');
+  res.json({
+    applications: mockDB.applications,
+    users: mockDB.users,
+    message: 'Mock DB Inhalt'
+  });
+});
+
+
 // Public route - Submit application
 router.post('/submit', [
   upload.single('profileImage'),
@@ -61,7 +72,8 @@ router.post('/submit', [
 ], applicationController.submitApplication);
 
 // Admin routes
-router.use(authenticateToken, requireAdmin);
+// auskommentiert fürs testing 
+// router.use(authenticateToken, requireAdmin);
 
 // Get all applications
 router.get('/', [

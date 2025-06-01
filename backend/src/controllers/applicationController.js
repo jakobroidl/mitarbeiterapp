@@ -4,6 +4,13 @@ const { generateResetToken } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const { getFileUrl } = require('../middleware/upload');
 const { v4: uuidv4 } = require('uuid');
+const submitApplication = async (req, res) => {
+  console.log('📨 Neue Bewerbung empfangen:', req.body.email);
+  
+  const connection = await db.getConnection();
+
+
+
 
 // Submit application
 const submitApplication = async (req, res) => {

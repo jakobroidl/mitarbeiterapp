@@ -6,6 +6,30 @@ const Applications = () => {
     { id: 2, name: 'Anna Schmidt', email: 'anna@example.com', date: '11.06.2024', status: 'pending' },
     { id: 3, name: 'Peter Weber', email: 'peter@example.com', date: '10.06.2024', status: 'accepted' },
   ];
+const fetchApplications = async (page = 1) => {
+  try {
+    setLoading(true);
+    console.log('📡 Fetching applications...');
+    
+    const params = {
+      page,
+      limit: 20,
+      ...(searchTerm && { search: searchTerm }),
+      ...(statusFilter && { status: statusFilter }),
+    };
+
+    const response = await api.get('/applications', { params });
+    console.log('✅ Applications response:', response.data);
+    
+    setApplications(response.data.applications || []); // Fallback auf leeres Array
+    setPagination(response.data.pagination);
+  } catch (error) {
+    console.error('❌ Error fetching applications:', error);
+    toast.error('Fehler beim Laden der Bewerbungen');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="space-y-6">
