@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* iOS-like system font stack */
+@layer base {
+  body {
+    @apply font-sf text-ios-gray-900 bg-ios-gray-100 antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Remove tap highlight on mobile */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ios-gray-400 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ios-gray-500;
+  }
+}
+
+/* iOS-like components */
+@layer components {
+  /* Navigation bar blur effect */
+  .ios-nav-blur {
+    @apply backdrop-blur-xl bg-white/80 border-b border-ios-gray-200;
+  }
+  
+  /* Tab bar blur effect */
+  .ios-tab-blur {
+    @apply backdrop-blur-xl bg-white/80 border-t border-ios-gray-200;
+  }
+  
+  /* Card style */
+  .ios-card {
+    @apply bg-white rounded-2xl shadow-ios;
+  }
+  
+  /* List item */
+  .ios-list-item {
+    @apply px-4 py-3 flex items-center justify-between bg-white 
+           border-b border-ios-gray-200 last:border-b-0;
+  }
+  
+  /* Button styles */
+  .ios-button {
+    @apply px-6 py-3 rounded-xl font-semibold text-center
+           transition-all duration-200 active:scale-95;
+  }
+  
+  .ios-button-primary {
+    @apply ios-button bg-ios-blue text-white 
+           hover:bg-blue-600 active:bg-blue-700;
+  }
+  
+  .ios-button-secondary {
+    @apply ios-button bg-ios-gray-200 text-ios-gray-900 
+           hover:bg-ios-gray-300 active:bg-ios-gray-400;
+  }
+  
+  .ios-button-danger {
+    @apply ios-button bg-ios-red text-white 
+           hover:bg-red-600 active:bg-red-700;
+  }
+  
+  /* Input styles */
+  .ios-input {
+    @apply w-full px-4 py-3 bg-ios-gray-100 rounded-xl
+           border border-ios-gray-300 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-ios-blue focus:border-transparent
+           placeholder-ios-gray-500;
+  }
+  
+  /* Switch/Toggle */
+  .ios-switch {
+    @apply relative inline-flex h-7 w-12 items-center rounded-full
+           transition-colors duration-200 ease-in-out cursor-pointer;
+  }
+  
+  .ios-switch-thumb {
+    @apply inline-block h-6 w-6 transform rounded-full bg-white
+           transition-transform duration-200 ease-in-out shadow-md;
+  }
+  
+  /* Badge */
+  .ios-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full
+           text-xs font-medium;
+  }
+  
+  /* Modal backdrop */
+  .ios-modal-backdrop {
+    @apply fixed inset-0 bg-black/40 backdrop-blur-sm;
+  }
+  
+  /* Section header */
+  .ios-section-header {
+    @apply px-4 py-2 text-sm font-medium text-ios-gray-600 
+           uppercase tracking-wider bg-ios-gray-100;
+  }
+}
+
+/* Animations */
+@layer utilities {
+  /* Bounce animation for loading */
+  .animate-bounce-subtle {
+    animation: bounce-subtle 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes bounce-subtle {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  
+  /* Slide animations */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  /* Safe area padding for mobile devices */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
