@@ -19,6 +19,7 @@ import Messages from './pages/Messages';
 import Knowledge from './pages/Knowledge';
 import Settings from './pages/Settings';
 import Apply from './pages/public/Apply';
+import StaffManagement from './pages/admin/StaffManagement';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -95,7 +96,7 @@ function App() {
           } />
           <Route path="/admin/staff" element={
             <ProtectedRoute requireAdmin>
-              <Staff />
+              <StaffManagement />
             </ProtectedRoute>
           } />
           <Route path="/admin/settings" element={

@@ -1,8 +1,9 @@
+
+// frontend/src/pages/admin/Applications.js
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import {format} from 'date-fns';
-import {de} from 'date-fns/locale';
+import ApplicationDetailModal from '../../components/ApplicationDetailModal';
 
 const Applications = () => {
   const [applications, setApplications] = useState([]);
@@ -10,6 +11,8 @@ const Applications = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState(null);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     fetchApplications();
@@ -18,7 +21,6 @@ const Applications = () => {
   const fetchApplications = async (page = 1) => {
     try {
       setLoading(true);
-      console.log('📡 Fetching applications...');
       
       const params = {
         page,
@@ -28,16 +30,20 @@ const Applications = () => {
       };
 
       const response = await api.get('/applications', { params });
-      console.log('✅ Applications response:', response.data);
       
       setApplications(response.data.applications || []);
       setPagination(response.data.pagination);
     } catch (error) {
-      console.error('❌ Error fetching applications:', error);
+      console.error('Error fetching applications:', error);
       toast.error('Fehler beim Laden der Bewerbungen');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewDetails = (application) => {
+    setSelectedApplication(application);
+    setModalOpen(true);
   };
 
   const StatusBadge = ({ status }) => {
@@ -56,7 +62,8 @@ const Applications = () => {
     );
   };
 
-  const handleAccept = async (id) => {
+  const handleQuickAccept = async (id, e) => {
+    e.stopPropagation();
     try {
       await api.post(`/applications/${id}/accept`);
       toast.success('Bewerbung angenommen');
@@ -66,7 +73,8 @@ const Applications = () => {
     }
   };
 
-  const handleReject = async (id) => {
+  const handleQuickReject = async (id, e) => {
+    e.stopPropagation();
     if (!window.confirm('Möchten Sie diese Bewerbung wirklich ablehnen?')) return;
     
     try {
@@ -78,15 +86,34 @@ const Applications = () => {
     }
   };
 
+  const EyeIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  );
+
+  const CheckIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+
+  const XIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Bewerbungen</h1>
         <div className="flex space-x-3">
           <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50">
-            Filter
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700">
+            <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
             Exportieren
           </button>
         </div>
@@ -115,7 +142,7 @@ const Applications = () => {
         </div>
       </div>
 
-      {/* Loading State */}
+      {/* Applications Table */}
       {loading ? (
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
@@ -135,7 +162,7 @@ const Applications = () => {
                     Bewerber
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    E-Mail
+                    Kontakt
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Datum
@@ -150,13 +177,25 @@ const Applications = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {applications.map((app) => (
-                  <tr key={app.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={app.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleViewDetails(app)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold">
-                            {app.first_name?.[0]}{app.last_name?.[0]}
-                          </div>
+                          {app.profile_image_url ? (
+                            <img
+                              src={`http://localhost:3001${app.profile_image_url}`}
+                              alt={`${app.first_name} ${app.last_name}`}
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold">
+                              {app.first_name?.[0]}{app.last_name?.[0]}
+                            </div>
+                          )}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
@@ -165,8 +204,9 @@ const Applications = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {app.email}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{app.email}</div>
+                      <div className="text-sm text-gray-500">{app.phone}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(app.created_at).toLocaleDateString('de-DE')}
@@ -175,25 +215,36 @@ const Applications = () => {
                       <StatusBadge status={app.status} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-blue-600 hover:text-blue-900 mr-3">
-                        Ansehen
-                      </button>
-                      {app.status === 'pending' && (
-                        <>
-                          <button 
-                            onClick={() => handleAccept(app.id)}
-                            className="text-green-600 hover:text-green-900 mr-3"
-                          >
-                            Annehmen
-                          </button>
-                          <button 
-                            onClick={() => handleReject(app.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Ablehnen
-                          </button>
-                        </>
-                      )}
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(app);
+                          }}
+                          className="text-blue-600 hover:text-blue-900 p-1"
+                          title="Details anzeigen"
+                        >
+                          <EyeIcon />
+                        </button>
+                        {app.status === 'pending' && (
+                          <>
+                            <button 
+                              onClick={(e) => handleQuickAccept(app.id, e)}
+                              className="text-green-600 hover:text-green-900 p-1"
+                              title="Schnell annehmen"
+                            >
+                              <CheckIcon />
+                            </button>
+                            <button 
+                              onClick={(e) => handleQuickReject(app.id, e)}
+                              className="text-red-600 hover:text-red-900 p-1"
+                              title="Schnell ablehnen"
+                            >
+                              <XIcon />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -205,7 +256,7 @@ const Applications = () => {
           {pagination && pagination.pages > 1 && (
             <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
               <div className="text-sm text-gray-700">
-                Seite {pagination.page} von {pagination.pages}
+                Seite {pagination.page} von {pagination.pages} ({pagination.total} Einträge)
               </div>
               <div className="flex space-x-2">
                 <button
@@ -227,8 +278,25 @@ const Applications = () => {
           )}
         </div>
       )}
+
+      {/* Application Detail Modal */}
+      <ApplicationDetailModal
+        application={selectedApplication}
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedApplication(null);
+        }}
+        onUpdate={() => {
+          fetchApplications();
+          setModalOpen(false);
+          setSelectedApplication(null);
+        }}
+      />
     </div>
   );
 };
 
 export default Applications;
+
+
