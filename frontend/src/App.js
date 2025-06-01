@@ -1,3 +1,4 @@
+// frontend/src/App.js
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
@@ -13,6 +14,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Applications from './pages//admin/Applications';
 import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
+import EventForm from './pages/admin/EventForm';
 import Staff from './pages/Staff';
 import Profile from './pages/Profile';
 import Messages from './pages/Messages';
@@ -84,6 +87,17 @@ function App() {
         }>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/events/new" element={
+            <ProtectedRoute requireAdmin>
+              <EventForm />
+            </ProtectedRoute>
+          } />
+          <Route path="/events/:id/edit" element={
+            <ProtectedRoute requireAdmin>
+              <EventForm />
+            </ProtectedRoute>
+          } />
           <Route path="/profile" element={<Profile />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/knowledge" element={<Knowledge />} />
@@ -127,3 +141,5 @@ function App() {
 }
 
 export default App;
+
+
