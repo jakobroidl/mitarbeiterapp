@@ -11,7 +11,7 @@ import PublicLayout from './layouts/PublicLayout';
 // Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Applications from './pages/Applications';
+import Applications from './pages//admin/Applications';
 import Events from './pages/Events';
 import Staff from './pages/Staff';
 import Profile from './pages/Profile';

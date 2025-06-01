@@ -72,8 +72,8 @@ router.post('/submit', [
 ], applicationController.submitApplication);
 
 // Admin routes
-// auskommentiert fürs testing 
-// router.use(authenticateToken, requireAdmin);
+
+router.use(authenticateToken, requireAdmin);
 
 // Get all applications
 router.get('/', [
