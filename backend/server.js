@@ -9,6 +9,7 @@ const path = require('path');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
+const shiftRoutes = require('./src/routes/shiftRoutes');
 const timeStampRoutes = require('./src/routes/timeStampRoutes');
 const knowledgeRoutes = require('./src/routes/knowledgeRoutes');
 const messageRoutes = require('./src/routes/messageRoutes');
@@ -16,7 +17,7 @@ const applicationRoutes = require('./src/routes/applicationRoutes');
 const qualificationRoutes = require('./src/routes/qualificationRoutes');
 const emailTemplateRoutes = require('./src/routes/emailTemplateRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
-const shiftRoutes = require('./src/routes/shiftRoutes');
+
 const app = express();
 
 // Security middleware
@@ -54,7 +55,6 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/qualifications', qualificationRoutes);
 app.use('/api/email-templates', emailTemplateRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api', shiftRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
