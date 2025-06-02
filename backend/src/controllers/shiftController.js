@@ -64,10 +64,3 @@ module.exports = {
   deleteShift,
 };
 
-module.exports = {
-  // ...
-  createShift: async (req, res) => {
-    // ...
-  },
-  // ...
-};
