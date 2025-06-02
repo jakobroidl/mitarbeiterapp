@@ -130,47 +130,38 @@ const ShiftManagement = () => {
         </div>
       </div>
 
-
-{shifts.length > 0 && (
-  <div className="space-y-4">
-    {shifts.map((shift) => (
-      <div key={shift.id} className="border rounded-lg p-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-semibold">{shift.name}</h3>
-            <p className="text-sm text-gray-600">
-              {format(new Date(shift.start_time), 'HH:mm')} - 
-              {format(new Date(shift.end_time), 'HH:mm')} Uhr
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium">
-              {shift.confirmed_count || 0} / {shift.required_staff} bestätigt
-            </p>
-            <p className="text-xs text-gray-500">
-              {shift.interested_count || 0} interessiert
-            </p>
-          </div>
-        </div>
+      {/* Shifts Overview - Placeholder */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Schichten ({shifts.length})
+        </h2>
         
-        <div className="mt-3 flex justify-end space-x-2">
-          <button
-            onClick={() => handleAssignStaff(shift)}
-            className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
-          >
-            Mitarbeiter zuteilen
-          </button>
-          <button
-            onClick={() => handleEditShift(shift)}
-            className="text-sm px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
-          >
-            Bearbeiten
-          </button>
-        </div>
+        {shifts.length === 0 ? (
+          <div className="text-center py-8">
+            <ClockIcon />
+            <p className="mt-2 text-gray-600">
+              Noch keine Schichten erstellt
+            </p>
+            <button
+              onClick={() => {
+                setSelectedShift(null);
+                setShowShiftModal(true);
+              }}
+              className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Erste Schicht erstellen
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Schichten werden hier angezeigt */}
+            <p className="text-gray-600">Schichtliste kommt im nächsten Schritt...</p>
+          </div>
+        )}
       </div>
-    ))}
-  </div>
-)}
-
+    </div>
+  );
+};
 
 export default ShiftManagement;
+
