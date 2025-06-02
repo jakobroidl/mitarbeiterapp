@@ -9,7 +9,7 @@ const path = require('path');
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const eventRoutes = require('./src/routes/eventRoutes');
-const shiftRoutes = require('./src/routes/shiftRoutes');
+const shiftRoutes = require('./src/routes/shiftRoutes'); // ✅ HINZUGEFÜGT
 const timeStampRoutes = require('./src/routes/timeStampRoutes');
 const knowledgeRoutes = require('./src/routes/knowledgeRoutes');
 const messageRoutes = require('./src/routes/messageRoutes');
@@ -47,7 +47,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/shifts', shiftRoutes);
+app.use('/api/shifts', shiftRoutes); // ✅ HINZUGEFÜGT
 app.use('/api/timestamps', timeStampRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/messages', messageRoutes);
