@@ -23,6 +23,7 @@ import Knowledge from './pages/Knowledge';
 import Settings from './pages/Settings';
 import Apply from './pages/public/Apply';
 import StaffManagement from './pages/admin/StaffManagement';
+import ShiftManagement from './pages/admin/ShiftManagement';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -118,7 +119,16 @@ function App() {
               <Settings />
             </ProtectedRoute>
           } />
+          <Route path="/events/:eventId/shifts" element={
+             <ProtectedRoute requireAdmin>
+               <ShiftManagement />
+             </ProtectedRoute>
+          } />
+
+          
         </Route>
+
+        
 
         {/* Default Redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
