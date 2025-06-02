@@ -47,7 +47,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/shifts', shiftRoutes); // ✅ HINZUGEFÜGT
+app.use('/api/shifts', shiftRoutes); 
 app.use('/api/timestamps', timeStampRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/messages', messageRoutes);
