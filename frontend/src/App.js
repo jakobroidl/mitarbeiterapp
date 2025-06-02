@@ -24,7 +24,6 @@ import Settings from './pages/Settings';
 import Apply from './pages/public/Apply';
 import StaffManagement from './pages/admin/StaffManagement';
 import ShiftManagement from './pages/admin/ShiftManagement';
-import KioskMode from './pages/KioskMode';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -79,7 +78,6 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
           <Route path="/apply" element={<Apply />} />
-          <Route path="/kiosk" element={<KioskMode />} />
         </Route>
 
         {/* Protected Routes with Layout */}
@@ -91,7 +89,6 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />
-          <Route path="/timestamp" element={<TimeStamp />} />
           <Route path="/admin/events/new" element={
             <ProtectedRoute requireAdmin>
               <EventForm />
