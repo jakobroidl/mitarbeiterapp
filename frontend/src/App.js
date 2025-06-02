@@ -103,7 +103,7 @@ function App() {
           <Route path="/messages" element={<Messages />} />
           <Route path="/knowledge" element={<Knowledge />} />
           
-          {/* Admin Routes */}
+        {/* Admin Routes */}
           <Route path="/admin/applications" element={
             <ProtectedRoute requireAdmin>
               <Applications />
@@ -119,14 +119,14 @@ function App() {
               <Settings />
             </ProtectedRoute>
           } />
+          {/* Shift Management Route - MUSS HIER SEIN */}
           <Route path="/events/:eventId/shifts" element={
-             <ProtectedRoute requireAdmin>
-               <ShiftManagement />
-             </ProtectedRoute>
+            <ProtectedRoute requireAdmin>
+              <ShiftManagement />
+            </ProtectedRoute>
           } />
-
-          
         </Route>
+
 
         
 
