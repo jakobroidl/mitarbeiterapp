@@ -5,6 +5,8 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import ShiftFormModal from '../../components/ShiftFormModal';
+import StaffAssignmentModal from '../../components/StaffAssignmentModal';
 
 const ShiftManagement = () => {
   const { eventId } = useParams();
@@ -15,6 +17,7 @@ const ShiftManagement = () => {
   const [selectedShift, setSelectedShift] = useState(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [activeShiftForAssignment, setActiveShiftForAssignment] = useState(null);
 
   useEffect(() => {
     fetchEventAndShifts();
@@ -39,6 +42,62 @@ const ShiftManagement = () => {
     }
   };
 
+  const handleCreateShift = () => {
+    setSelectedShift(null);
+    setShowShiftModal(true);
+  };
+
+  const handleEditShift = (shift) => {
+    setSelectedShift(shift);
+    setShowShiftModal(true);
+  };
+
+  const handleDeleteShift = async (shiftId) => {
+    if (!window.confirm('Möchten Sie diese Schicht wirklich löschen?')) return;
+
+    try {
+      await api.delete(`/shifts/${shiftId}`);
+      toast.success('Schicht gelöscht');
+      fetchEventAndShifts();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Fehler beim Löschen');
+    }
+  };
+
+  const handleAssignStaff = (shift) => {
+    setActiveShiftForAssignment(shift);
+    setShowAssignModal(true);
+  };
+
+  const handleRemoveStaffFromShift = async (shiftId, staffId) => {
+    if (!window.confirm('Möchten Sie diesen Mitarbeiter wirklich von der Schicht entfernen?')) return;
+
+    try {
+      await api.delete(`/shifts/${shiftId}/staff/${staffId}`);
+      toast.success('Mitarbeiter entfernt');
+      fetchEventAndShifts();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Fehler beim Entfernen');
+    }
+  };
+
+  const getStatusBadge = (registration) => {
+    const statusConfig = {
+      interested: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Interessiert' },
+      assigned: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Zugeteilt' },
+      confirmed: { bg: 'bg-green-100', text: 'text-green-800', label: 'Bestätigt' },
+    };
+
+    const config = statusConfig[registration.status] || statusConfig.interested;
+    const typeLabel = registration.assignment_type === 'final' ? ' (Endgültig)' : ' (Vorläufig)';
+
+    return (
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}>
+        {config.label}{registration.status === 'assigned' ? typeLabel : ''}
+      </span>
+    );
+  };
+
   // Icons
   const ClockIcon = () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,6 +120,24 @@ const ShiftManagement = () => {
   const ChevronLeftIcon = () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+
+  const EditIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  );
+
+  const TrashIcon = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+
+  const XIcon = () => (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 
@@ -97,10 +174,7 @@ const ShiftManagement = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              setSelectedShift(null);
-              setShowShiftModal(true);
-            }}
+            onClick={handleCreateShift}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 flex items-center space-x-2"
           >
             <PlusIcon />
@@ -130,47 +204,163 @@ const ShiftManagement = () => {
         </div>
       </div>
 
-
-{shifts.length > 0 && (
-  <div className="space-y-4">
-    {shifts.map((shift) => (
-      <div key={shift.id} className="border rounded-lg p-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-semibold">{shift.name}</h3>
-            <p className="text-sm text-gray-600">
-              {format(new Date(shift.start_time), 'HH:mm')} - 
-              {format(new Date(shift.end_time), 'HH:mm')} Uhr
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium">
-              {shift.confirmed_count || 0} / {shift.required_staff} bestätigt
-            </p>
-            <p className="text-xs text-gray-500">
-              {shift.interested_count || 0} interessiert
-            </p>
-          </div>
-        </div>
+      {/* Shifts */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Schichten ({shifts.length})
+        </h2>
         
-        <div className="mt-3 flex justify-end space-x-2">
-          <button
-            onClick={() => handleAssignStaff(shift)}
-            className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
-          >
-            Mitarbeiter zuteilen
-          </button>
-          <button
-            onClick={() => handleEditShift(shift)}
-            className="text-sm px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
-          >
-            Bearbeiten
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
+        {shifts.length === 0 ? (
+          <div className="text-center py-8">
+            <ClockIcon />
+            <p className="mt-2 text-gray-600">
+              Noch keine Schichten erstellt
+            </p>
+            <button
+              onClick={handleCreateShift}
+              className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Erste Schicht erstellen
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {shifts.map((shift) => (
+              <div key={shift.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                {/* Shift Header */}
+                <div className="bg-gray-50 p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{shift.name}</h3>
+                      <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                        <span className="flex items-center">
+                          <ClockIcon className="w-4 h-4 mr-1" />
+                          {format(new Date(shift.start_time), 'HH:mm')} - 
+                          {format(new Date(shift.end_time), 'HH:mm')} Uhr
+                        </span>
+                        <span className="flex items-center">
+                          <UsersIcon className="w-4 h-4 mr-1" />
+                          {shift.confirmed_count || 0} / {shift.required_staff} bestätigt
+                        </span>
+                      </div>
+                      {shift.notes && (
+                        <p className="mt-2 text-sm text-gray-600">{shift.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <button
+                        onClick={() => handleEditShift(shift)}
+                        className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                        title="Bearbeiten"
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteShift(shift.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Löschen"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
 
+                  {/* Statistics */}
+                  <div className="flex space-x-6 mt-3 pt-3 border-t border-gray-200">
+                    <div className="text-sm">
+                      <span className="text-gray-500">Interessiert:</span>
+                      <span className="ml-1 font-medium text-yellow-600">
+                        {shift.interested_count || 0}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Zugeteilt:</span>
+                      <span className="ml-1 font-medium text-blue-600">
+                        {shift.assigned_count || 0}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-500">Bestätigt:</span>
+                      <span className="ml-1 font-medium text-green-600">
+                        {shift.confirmed_count || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Registrations */}
+                {shift.registrations && shift.registrations.length > 0 && (
+                  <div className="p-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">
+                      Zugeteilte Mitarbeiter
+                    </h4>
+                    <div className="space-y-2">
+                      {shift.registrations.map((reg) => (
+                        <div key={reg.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <span className="font-medium text-sm">
+                              {reg.first_name} {reg.last_name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({reg.personal_code})
+                            </span>
+                            {getStatusBadge(reg)}
+                          </div>
+                          {reg.status !== 'confirmed' && (
+                            <button
+                              onClick={() => handleRemoveStaffFromShift(shift.id, reg.staff_id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Entfernen"
+                            >
+                              <XIcon />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="p-4 bg-gray-50 border-t">
+                  <button
+                    onClick={() => handleAssignStaff(shift)}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Mitarbeiter zuteilen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <ShiftFormModal
+        isOpen={showShiftModal}
+        onClose={() => {
+          setShowShiftModal(false);
+          setSelectedShift(null);
+        }}
+        eventId={eventId}
+        eventDate={event?.start_date}
+        shift={selectedShift}
+        onSuccess={fetchEventAndShifts}
+      />
+
+      <StaffAssignmentModal
+        isOpen={showAssignModal}
+        onClose={() => {
+          setShowAssignModal(false);
+          setActiveShiftForAssignment(null);
+        }}
+        shift={activeShiftForAssignment}
+        eventId={eventId}
+        onSuccess={fetchEventAndShifts}
+      />
+    </div>
+  );
+};
 
 export default ShiftManagement;
