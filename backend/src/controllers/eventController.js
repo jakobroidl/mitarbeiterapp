@@ -473,10 +473,27 @@ const inviteStaff = async (req, res) => {
 // Get event shifts (for staff)
 const getEventShifts = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { eventId } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
-    // Get staff profile
+    // For admin, return all shifts
+    if (userRole === 'admin') {
+      const [shifts] = await db.execute(
+        `SELECT 
+          s.*,
+          (SELECT COUNT(*) FROM shift_registrations WHERE shift_id = s.id) as registered_count,
+          (SELECT COUNT(*) FROM shift_registrations WHERE shift_id = s.id AND status = 'confirmed') as confirmed_count
+        FROM shifts s
+        WHERE s.event_id = ?
+        ORDER BY s.start_time`,
+        [eventId]
+      );
+
+      return res.json(shifts);
+    }
+
+    // For staff, check if invited
     const [staffProfile] = await db.execute(
       'SELECT id FROM staff_profiles WHERE user_id = ?',
       [userId]
@@ -491,7 +508,7 @@ const getEventShifts = async (req, res) => {
     // Check if invited to event
     const [invitation] = await db.execute(
       'SELECT * FROM event_invitations WHERE event_id = ? AND staff_id = ?',
-      [id, staffId]
+      [eventId, staffId]
     );
 
     if (invitation.length === 0) {
@@ -509,14 +526,164 @@ const getEventShifts = async (req, res) => {
       LEFT JOIN shift_registrations sr ON s.id = sr.shift_id AND sr.staff_id = ?
       WHERE s.event_id = ?
       ORDER BY s.start_time`,
-      [staffId, id]
+      [staffId, eventId]
     );
 
-    res.json({ shifts });
+    res.json(shifts);
   } catch (error) {
     console.error('Get event shifts error:', error);
     res.status(500).json({
       message: 'Fehler beim Abrufen der Schichten'
+    });
+  }
+};
+
+// Create a shift for an event
+const createEventShift = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { name, startTime, endTime, requiredStaff, notes } = req.body;
+
+    // Validate input
+    if (!name || !startTime || !endTime) {
+      return res.status(400).json({
+        message: 'Name, Startzeit und Endzeit sind erforderlich'
+      });
+    }
+
+    // Check if event exists
+    const [event] = await db.execute(
+      'SELECT id FROM events WHERE id = ?',
+      [eventId]
+    );
+
+    if (event.length === 0) {
+      return res.status(404).json({ message: 'Veranstaltung nicht gefunden' });
+    }
+
+    // Validate times
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (end <= start) {
+      return res.status(400).json({
+        message: 'Endzeit muss nach der Startzeit liegen'
+      });
+    }
+
+    const [result] = await db.execute(
+      `INSERT INTO shifts (event_id, name, start_time, end_time, required_staff, notes) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [eventId, name, startTime, endTime, requiredStaff || 1, notes || null]
+    );
+
+    res.status(201).json({
+      message: 'Schicht erfolgreich erstellt',
+      shiftId: result.insertId
+    });
+  } catch (error) {
+    console.error('Create shift error:', error);
+    res.status(500).json({
+      message: 'Fehler beim Erstellen der Schicht'
+    });
+  }
+};
+
+// Update a shift
+const updateEventShift = async (req, res) => {
+  try {
+    const { eventId, shiftId } = req.params;
+    const { name, start_time, end_time, required_staff, notes } = req.body;
+
+    // Check if shift belongs to event
+    const [shift] = await db.execute(
+      'SELECT id FROM shifts WHERE id = ? AND event_id = ?',
+      [shiftId, eventId]
+    );
+
+    if (shift.length === 0) {
+      return res.status(404).json({ message: 'Schicht nicht gefunden' });
+    }
+
+    // Build update query
+    const updateFields = [];
+    const values = [];
+
+    if (name !== undefined) {
+      updateFields.push('name = ?');
+      values.push(name);
+    }
+    if (start_time !== undefined) {
+      updateFields.push('start_time = ?');
+      values.push(start_time);
+    }
+    if (end_time !== undefined) {
+      updateFields.push('end_time = ?');
+      values.push(end_time);
+    }
+    if (required_staff !== undefined) {
+      updateFields.push('required_staff = ?');
+      values.push(required_staff);
+    }
+    if (notes !== undefined) {
+      updateFields.push('notes = ?');
+      values.push(notes);
+    }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: 'Keine Änderungen angegeben' });
+    }
+
+    values.push(shiftId);
+
+    await db.execute(
+      `UPDATE shifts SET ${updateFields.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    res.json({ message: 'Schicht erfolgreich aktualisiert' });
+  } catch (error) {
+    console.error('Update shift error:', error);
+    res.status(500).json({
+      message: 'Fehler beim Aktualisieren der Schicht'
+    });
+  }
+};
+
+// Delete a shift
+const deleteEventShift = async (req, res) => {
+  try {
+    const { eventId, shiftId } = req.params;
+
+    // Check if shift belongs to event
+    const [shift] = await db.execute(
+      'SELECT id FROM shifts WHERE id = ? AND event_id = ?',
+      [shiftId, eventId]
+    );
+
+    if (shift.length === 0) {
+      return res.status(404).json({ message: 'Schicht nicht gefunden' });
+    }
+
+    // Check if shift has registrations
+    const [registrations] = await db.execute(
+      'SELECT COUNT(*) as count FROM shift_registrations WHERE shift_id = ?',
+      [shiftId]
+    );
+
+    if (registrations[0].count > 0) {
+      return res.status(400).json({
+        message: 'Schicht kann nicht gelöscht werden, da bereits Anmeldungen vorhanden sind'
+      });
+    }
+
+    await db.execute('DELETE FROM shifts WHERE id = ?', [shiftId]);
+
+    res.json({ message: 'Schicht erfolgreich gelöscht' });
+  } catch (error) {
+    console.error('Delete shift error:', error);
+    res.status(500).json({
+      message: 'Fehler beim Löschen der Schicht'
     });
   }
 };
@@ -652,6 +819,9 @@ module.exports = {
   deleteEvent,
   inviteStaff,
   getEventShifts,
+  createEventShift,
+  updateEventShift,
+  deleteEventShift,
   registerForShift,
   respondToInvitation
 };
