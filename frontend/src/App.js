@@ -88,12 +88,12 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />
-          <Route path="/events/new" element={
+          <Route path="/admin/events/new" element={
             <ProtectedRoute requireAdmin>
               <EventForm />
             </ProtectedRoute>
           } />
-          <Route path="/events/:id/edit" element={
+          <Route path="/admin/events/:id/edit" element={
             <ProtectedRoute requireAdmin>
               <EventForm />
             </ProtectedRoute>

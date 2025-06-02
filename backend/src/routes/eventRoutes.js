@@ -1,18 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
-
-// Placeholder controllers - to be implemented
-const eventController = {
-  getAllEvents: (req, res) => res.json({ events: [] }),
-  getEvent: (req, res) => res.json({ event: {} }),
-  createEvent: (req, res) => res.status(201).json({ message: 'Event created' }),
-  updateEvent: (req, res) => res.json({ message: 'Event updated' }),
-  deleteEvent: (req, res) => res.json({ message: 'Event deleted' }),
-  inviteStaff: (req, res) => res.json({ message: 'Staff invited' }),
-  getEventShifts: (req, res) => res.json({ shifts: [] }),
-  registerForShift: (req, res) => res.json({ message: 'Registered for shift' }),
-};
+const eventController = require('../controllers/eventController'); // WICHTIG: Den echten Controller importieren!
 
 // Public routes (for staff)
 router.use(authenticateToken);
@@ -28,6 +17,9 @@ router.get('/:id/shifts', requireStaff, eventController.getEventShifts);
 
 // Register for shift
 router.post('/:eventId/shifts/:shiftId/register', requireStaff, eventController.registerForShift);
+
+// Respond to invitation (accept/decline)
+router.post('/:id/respond', requireStaff, eventController.respondToInvitation);
 
 // Admin only routes
 router.post('/', requireAdmin, eventController.createEvent);
