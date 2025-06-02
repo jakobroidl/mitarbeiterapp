@@ -1,59 +1,40 @@
+// frontend/src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Layout from './components/Layout';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
+import LoadingScreen from './components/common/LoadingScreen';
+import { Toaster } from 'react-hot-toast';
+
+// Layouts
+import DashboardLayout from './layouts/DashboardLayout';
+import PublicLayout from './layouts/PublicLayout';
+
+// Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
+import Applications from './pages//admin/Applications';
 import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
+import EventForm from './pages/admin/EventForm';
+import Staff from './pages/Staff';
+import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Knowledge from './pages/Knowledge';
-import TimeStamps from './pages/TimeStamps'; // Korrigierter Import
+import Settings from './pages/Settings';
+import Apply from './pages/public/Apply';
+import StaffManagement from './pages/admin/StaffManagement';
+import ShiftManagement from './pages/admin/ShiftManagement';
 import KioskMode from './pages/KioskMode';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminEvents from './pages/admin/AdminEvents';
-import AdminMessages from './pages/admin/AdminMessages';
-import AdminKnowledge from './pages/admin/AdminKnowledge';
-import AdminTimeStamps from './pages/admin/AdminTimeStamps';
-import AdminSettings from './pages/admin/AdminSettings';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  const { user, isAdmin } = useAuth();
   
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   
-  if (adminOnly && user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return children;
-};
-
-// Public Route Component (redirect if already logged in)
-const PublicRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-  
-  if (user) {
+  if (requireAdmin && !isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -61,80 +42,117 @@ const PublicRoute = ({ children }) => {
 };
 
 function App() {
+  const { loading, user } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } />
-            
-            {/* Kiosk Mode - Public */}
-            <Route path="/kiosk" element={<KioskMode />} />
-            
-            {/* Protected Routes */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="events" element={<Events />} />
-              <Route path="messages" element={<Messages />} />
-              <Route path="knowledge" element={<Knowledge />} />
-              <Route path="timestamps" element={<TimeStamps />} />
-              
-              {/* Admin Routes */}
-              <Route path="admin" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/users" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminUsers />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/events" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminEvents />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/messages" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminMessages />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/knowledge" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminKnowledge />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/timestamps" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminTimeStamps />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/settings" element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminSettings />
-                </ProtectedRoute>
-              } />
-            </Route>
-            
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+    <>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#34C759',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#FF3B30',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      <Routes>
+        {/* Public Routes */}
+        <Route element={<PublicLayout />}>
+          <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+          <Route path="/apply" element={<Apply />} />
+          <Route path="/kiosk" element={<KioskMode />} />
+        </Route>
+
+        {/* Protected Routes with Layout */}
+        <Route element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/timestamp" element={<TimeStamp />} />
+          <Route path="/admin/events/new" element={
+            <ProtectedRoute requireAdmin>
+              <EventForm />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/events/:id/edit" element={
+            <ProtectedRoute requireAdmin>
+              <EventForm />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/knowledge" element={<Knowledge />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin/applications" element={
+            <ProtectedRoute requireAdmin>
+              <Applications />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/staff" element={
+            <ProtectedRoute requireAdmin>
+              <StaffManagement />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute requireAdmin>
+              <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/events/:eventId/shifts" element={
+             <ProtectedRoute requireAdmin>
+               <ShiftManagement />
+             </ProtectedRoute>
+          } />
+
+          
+        </Route>
+
+        
+
+        {/* Default Redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        {/* 404 */}
+        <Route path="*" element={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <h1 className="text-6xl font-bold text-gray-300">404</h1>
+              <p className="mt-2 text-lg text-gray-600">Seite nicht gefunden</p>
+              <a href="/" className="mt-4 inline-block bg-blue-500 text-white px-6 py-3 rounded-xl hover:bg-blue-600 transition-colors">
+                Zur Startseite
+              </a>
+            </div>
+          </div>
+        } />
+      </Routes>
+    </>
   );
 }
 
 export default App;
+
+
