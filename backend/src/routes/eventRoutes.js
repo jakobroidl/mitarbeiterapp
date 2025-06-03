@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const eventController = require('../controllers/eventController');
+const shiftController = require('../controllers/shiftController');
 
 // Public routes (for staff)
 router.use(authenticateToken);
@@ -33,6 +34,6 @@ router.put('/:eventId/shifts/:shiftId', requireAdmin, eventController.updateEven
 router.delete('/:eventId/shifts/:shiftId', requireAdmin, eventController.deleteEventShift);
 
 // Get event invitations (for shift assignment)
-router.get('/:eventId/invitations', requireAdmin, eventController.getEventInvitations);
+router.get('/:eventId/invitations', requireAdmin, shiftController.getEventInvitations);
 
 module.exports = router;
