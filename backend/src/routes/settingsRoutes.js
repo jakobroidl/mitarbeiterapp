@@ -1,4 +1,7 @@
 // backend/src/routes/settingsRoutes.js
+const express = require('express');
+const router = express.Router();
+const { body, param } = require('express-validator');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const db = require('../config/database');

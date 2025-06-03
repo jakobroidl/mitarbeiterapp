@@ -1,4 +1,7 @@
 // backend/src/routes/messageRoutes.js
+const express = require('express');
+const router = express.Router();
+const { body, param } = require('express-validator');
 const messageController = require('../controllers/messageController');
 const { authenticateToken } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -79,5 +82,3 @@ router.delete('/:id',
 );
 
 module.exports = router;
-
-

@@ -1,4 +1,7 @@
 // backend/src/routes/shiftRoutes.js
+const express = require('express');
+const router = express.Router();
+const { body, param } = require('express-validator');
 const shiftController = require('../controllers/shiftController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -115,5 +118,4 @@ router.patch('/:shiftId/status',
 );
 
 module.exports = router;
-
 
