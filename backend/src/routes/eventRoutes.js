@@ -32,4 +32,7 @@ router.post('/:eventId/shifts', requireAdmin, eventController.createEventShift);
 router.put('/:eventId/shifts/:shiftId', requireAdmin, eventController.updateEventShift);
 router.delete('/:eventId/shifts/:shiftId', requireAdmin, eventController.deleteEventShift);
 
+// Get event invitations (for shift assignment)
+router.get('/:eventId/invitations', requireAdmin, eventController.getEventInvitations);
+
 module.exports = router;

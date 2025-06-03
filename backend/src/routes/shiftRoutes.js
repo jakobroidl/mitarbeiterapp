@@ -17,5 +17,9 @@ router.delete('/:shiftId', requireAdmin, shiftController.deleteShift);
 
 // Get shift registrations (admin only)
 router.get('/:shiftId/registrations', requireAdmin, shiftController.getShiftRegistrations);
+// NEW: Staff assignment routes (admin only)
+router.post('/:shiftId/assign', requireAdmin, shiftController.assignStaffToShift);
+router.post('/:shiftId/bulk-assign', requireAdmin, shiftController.bulkAssignStaff);
+router.post('/registrations/:registrationId/confirm', requireAdmin, shiftController.confirmShiftAssignment);
 
 module.exports = router;
