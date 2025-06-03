@@ -24,6 +24,10 @@ import Settings from './pages/Settings';
 import Apply from './pages/public/Apply';
 import StaffManagement from './pages/admin/StaffManagement';
 import ShiftManagement from './pages/admin/ShiftManagement';
+import Timestamp from './pages/Timestamp';
+import Reports from './pages/Reports';
+import Templates from './pages/Templates';
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -127,7 +131,20 @@ function App() {
           } />
         </Route>
 
-
+<Route element={<DashboardLayout />}>
+  {/* ... */}
+  <Route path="/timestamp" element={<Timestamp />} />
+  <Route path="/reports" element={
+    <ProtectedRoute requireAdmin>
+      <Reports />
+    </ProtectedRoute>
+  } />
+  <Route path="/templates" element={
+    <ProtectedRoute requireAdmin>
+      <Templates />
+    </ProtectedRoute>
+  } />
+</Route>
         
 
         {/* Default Redirect */}

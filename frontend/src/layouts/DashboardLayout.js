@@ -79,7 +79,6 @@ const DashboardLayout = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, show: true },
-    { name: 'Veranstaltungen', href: '/events', icon: CalendarIcon, show: !isAdmin },
     { name: 'Nachrichten', href: '/messages', icon: MessageIcon, show: true },
     { name: 'Wissensdatenbank', href: '/knowledge', icon: BookIcon, show: true },
     { name: 'Mein Profil', href: '/profile', icon: UserIcon, show: true },
@@ -89,6 +88,11 @@ const DashboardLayout = () => {
     { name: 'Bewerbungen', href: '/admin/applications', icon: DocumentIcon },
     { name: 'Mitarbeiter', href: '/admin/staff', icon: UsersIcon },
     { name: 'Einstellungen', href: '/admin/settings', icon: CogIcon },
+    { name: 'Veranstaltungen', href: '/events', icon: CalendarIcon,},
+    { name: 'Stempeluhr', href: '/timestamp', icon: CalendarIcon },
+   { name: 'Berichte', href: '/reports', icon: DocumentIcon },
+  { name: 'Vorlagen', href: '/templates', icon: DocumentIcon },
+
   ];
 
   return (

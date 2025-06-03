@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import {useNavigate} from 'react-router-dom';
+
+const navigate =useNavigate();
 
 // Mock Auth Hook
 const useAuth = () => ({
