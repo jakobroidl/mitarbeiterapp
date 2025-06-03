@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import ShiftModal from '../../components/ShiftModal';
+import ShiftAssignmentModal from '../../components/ShiftAssignmentModal';
 import { 
   PlusIcon, 
   PencilIcon, 
@@ -10,7 +11,8 @@ import {
   ChevronLeftIcon, 
   ClockIcon,
   UserGroupIcon,
-  CalendarIcon
+  CalendarIcon,
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -23,6 +25,8 @@ const ShiftManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedShift, setSelectedShift] = useState(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentShift, setAssignmentShift] = useState(null);
 
   useEffect(() => {
     fetchEventAndShifts();
