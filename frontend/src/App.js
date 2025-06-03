@@ -1,4 +1,3 @@
-// frontend/src/App.js
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
@@ -26,8 +25,6 @@ import StaffManagement from './pages/admin/StaffManagement';
 import ShiftManagement from './pages/admin/ShiftManagement';
 import Timestamp from './pages/Timestamp';
 import Reports from './pages/Reports';
-import Templates from './pages/Templates';
-import UserSettingsPage from './pages/UserSettingsPage'
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -103,7 +100,7 @@ function App() {
               <EventForm />
             </ProtectedRoute>
           } />
-          <Route path="/profile" element={<UserSettingsPage />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/knowledge" element={<Knowledge />} />
           
@@ -139,11 +136,6 @@ function App() {
       <Reports />
     </ProtectedRoute>
   } />
-  <Route path="/templates" element={
-    <ProtectedRoute requireAdmin>
-      <Templates />
-    </ProtectedRoute>
-  } />
 </Route>
         
 
@@ -168,5 +160,3 @@ function App() {
 }
 
 export default App;
-
-
