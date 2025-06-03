@@ -24,4 +24,12 @@ router.patch('/:id/toggle-active', requireAdmin, userController.toggleUserActive
 // Update user qualifications (admin only)
 router.put('/:id/qualifications', requireAdmin, userController.updateUserQualifications);
 
+// Update user profile
+router.put('/me/profile', userController.updateUserProfile);
+
+// Update user profile
+router.put('/me/profile', userController.updateUserProfile);
+
+
+
 module.exports = router;

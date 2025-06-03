@@ -19,6 +19,76 @@ const getAllUsers = async (req, res) => {
     res.status(500).json({ message: 'Fehler beim Abrufen der Benutzer' });
   }
 };
+// Get user profile
+const getUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [profile] = await db.execute(
+      `SELECT 
+        u.first_name, u.last_name, u.email,
+        p.phone, p.address, p.postal_code, p.city
+      FROM users u
+      LEFT JOIN user_profiles p ON u.id = p.user_id
+      WHERE u.id = ?`,
+      [userId]
+    );
+
+    res.json(profile[0]);
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    res.status(500).json({
+      message: 'Fehler beim Abrufen des Benutzerprofils',
+    });
+  }
+};
+
+// Update user profile
+const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { firstName, lastName, email, phone, address, postalCode, city } = req.body;
+
+    // Update user
+    await db.execute(
+      'UPDATE users SET first_name = ?, last_name = ?, email = ? WHERE id = ?',
+      [firstName, lastName, email, userId]
+    );
+
+    // Update or create user profile
+    await db.execute(
+      `INSERT INTO user_profiles (user_id, phone, address, postal_code, city)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        phone = VALUES(phone),
+        address = VALUES(address),
+        postal_code = VALUES(postal_code),
+        city = VALUES(city)`,
+      [userId, phone, address, postalCode, city]
+    );
+
+    // Get updated user and profile
+    const [updatedUser] = await db.execute(
+      `SELECT 
+        u.id, u.first_name, u.last_name, u.email, u.role,
+        p.phone, p.address, p.postal_code, p.city
+      FROM users u
+      LEFT JOIN user_profiles p ON u.id = p.user_id
+      WHERE u.id = ?`,
+      [userId]
+    );
+
+    res.json({
+      message: 'Benutzerprofil erfolgreich aktualisiert',
+      user: updatedUser[0],
+    });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    res.status(500).json({
+      message: 'Fehler beim Aktualisieren des Benutzerprofils',
+    });
+  }
+};
 
 // Get single user
 const getUser = async (req, res) => {
@@ -243,4 +313,5 @@ module.exports = {
   deleteUser,
   toggleUserActive,
   updateUserQualifications,
+  updateUserProfile,
 };
