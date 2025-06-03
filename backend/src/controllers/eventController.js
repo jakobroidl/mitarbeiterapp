@@ -424,10 +424,16 @@ const inviteStaff = async (req, res) => {
     const invitations = staff_ids.map(staff_id => [id, staff_id, 'pending']);
 
     // Insert invitations (ignore duplicates)
-    await connection.query(
-      'INSERT IGNORE INTO event_invitations (event_id, staff_id, status) VALUES ?',
-      [invitations]
-    );
+       try {
+      await connection.query(
+        'INSERT IGNORE INTO event_invitations (event_id, staff_id, status) VALUES ?',
+        [invitations]  
+      );
+    } catch (error) {
+      console.error('Error inserting invitations:', error);
+      throw error;
+    }
+
 
     // Get invited staff details for email
     if (send_email) {

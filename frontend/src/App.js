@@ -27,7 +27,7 @@ import ShiftManagement from './pages/admin/ShiftManagement';
 import Timestamp from './pages/Timestamp';
 import Reports from './pages/Reports';
 import Templates from './pages/Templates';
-
+import UserSettingsPage from './pages/UserSettingsPage'
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -103,7 +103,7 @@ function App() {
               <EventForm />
             </ProtectedRoute>
           } />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<UserSettingsPage />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/knowledge" element={<Knowledge />} />
           
