@@ -409,3 +409,5 @@ WHERE e.status = 'published'
   AND e.end_date >= NOW()
 ORDER BY sh.start_time;
 
+
+
