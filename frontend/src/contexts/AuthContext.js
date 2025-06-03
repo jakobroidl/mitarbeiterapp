@@ -125,6 +125,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
+  const isStaff = () => {
+    return user?.role === 'staff';
+  };
+
   const value = {
     user,
     loading,
@@ -134,10 +142,10 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     requestPasswordReset,
     setInitialPassword,
-    validateToken
+    validateToken,
+    isAdmin,
+    isStaff
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-
