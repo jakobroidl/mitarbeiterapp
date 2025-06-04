@@ -931,6 +931,96 @@ const manualClockEntry = async (req, res) => {
   }
 };
 
+const exportTimeEntries = async (req, res) => {
+  try {
+    const { 
+      staff_id,
+      event_id,
+      from,
+      to,
+      format = 'csv'
+    } = req.query;
+    
+    let query = `
+      SELECT 
+        te.*,
+        sp.first_name,
+        sp.last_name,
+        sp.personal_code,
+        p.name as position_name,
+        e.name as event_name,
+        s.name as shift_name
+      FROM timeclock_entries te
+      JOIN staff_profiles sp ON te.staff_id = sp.id
+      LEFT JOIN positions p ON te.position_id = p.id
+      LEFT JOIN events e ON te.event_id = e.id
+      LEFT JOIN shifts s ON te.shift_id = s.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    if (staff_id) {
+      query += ' AND te.staff_id = ?';
+      params.push(staff_id);
+    }
+    
+    if (event_id) {
+      query += ' AND te.event_id = ?';
+      params.push(event_id);
+    }
+    
+    if (from) {
+      query += ' AND te.clock_in >= ?';
+      params.push(from);
+    }
+    
+    if (to) {
+      query += ' AND te.clock_in <= ?';
+      params.push(to);
+    }
+    
+    query += ' ORDER BY te.clock_in DESC';
+    
+    const [entries] = await db.execute(query, params);
+    
+    if (format === 'csv') {
+      // CSV Format
+      let csv = 'Mitarbeiter,Personal-Code,Datum,Einstempelzeit,Ausstempelzeit,Dauer (Minuten),Pause (Minuten),Position,Veranstaltung\n';
+      
+      entries.forEach(entry => {
+        const date = format(new Date(entry.clock_in), 'dd.MM.yyyy');
+        const clockIn = format(new Date(entry.clock_in), 'HH:mm');
+        const clockOut = entry.clock_out ? format(new Date(entry.clock_out), 'HH:mm') : '';
+        
+        csv += `"${entry.first_name} ${entry.last_name}",`;
+        csv += `"${entry.personal_code}",`;
+        csv += `"${date}",`;
+        csv += `"${clockIn}",`;
+        csv += `"${clockOut}",`;
+        csv += `"${entry.total_minutes || 0}",`;
+        csv += `"${entry.break_minutes || 0}",`;
+        csv += `"${entry.position_name || ''}",`;
+        csv += `"${entry.event_name || ''}"\n`;
+      });
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=stempeluhr_${from}_${to}.csv`);
+      res.send('\ufeff' + csv); // UTF-8 BOM für Excel
+    } else {
+      // Excel format würde hier implementiert werden
+      res.status(501).json({ message: 'Excel Export noch nicht implementiert' });
+    }
+    
+  } catch (error) {
+    console.error('Fehler beim Exportieren der Zeiteinträge:', error);
+    res.status(500).json({ 
+      message: 'Fehler beim Exportieren der Zeiteinträge' 
+    });
+  }
+};
+
+
 module.exports = {
   // Kiosk Mode
   kioskClockIn,
@@ -943,6 +1033,7 @@ module.exports = {
   deleteTimeEntry,
   generateTimeReport,
   manualClockEntry,
+  exportTimeEntries, // NEU
   
   // Staff
   getMyTimeEntries,
@@ -950,5 +1041,4 @@ module.exports = {
   // Shared
   getAvailablePositions
 };
-
 

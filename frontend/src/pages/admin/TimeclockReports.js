@@ -78,14 +78,32 @@ const TimeclockReports = () => {
         ...(filters.search && { search: filters.search })
       });
 
-      const response = await api.get(`/timeclock/entries?${params}`);
+      const response = await api.get(`/timeclock?${params}`);
       
-      setEntries(response.data.entries);
-      setPagination(response.data.pagination);
-      setStats(response.data.stats);
+      setEntries(response.data.entries || []);
+      setPagination(response.data.pagination || {
+        page: 1,
+        limit: 50,
+        total: 0,
+        pages: 0
+      });
+      
+      // Berechne Stats aus den Einträgen
+      const totalMinutes = response.data.entries?.reduce((sum, entry) => sum + (entry.total_minutes || 0), 0) || 0;
+      const activeEntries = response.data.entries?.filter(e => e.status === 'active').length || 0;
+      
+      setStats({
+        total_hours: Math.round(totalMinutes / 60),
+        total_entries: response.data.entries?.length || 0,
+        active_now: activeEntries,
+        average_per_day: response.data.entries?.length > 0 ? 
+          Math.round((totalMinutes / 60) / Math.max(1, new Set(response.data.entries.map(e => format(parseISO(e.clock_in), 'yyyy-MM-dd'))).size)) : 0
+      });
+      
     } catch (error) {
       console.error('Fehler beim Laden der Einträge:', error);
       toast.error('Fehler beim Laden der Zeiteinträge');
+      setEntries([]);
     } finally {
       setLoading(false);
     }
@@ -143,13 +161,6 @@ const TimeclockReports = () => {
             <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
             CSV Export
           </button>
-          <button
-            onClick={() => exportReport('xlsx')}
-            className="ios-button-primary"
-          >
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-            Excel Export
-          </button>
         </div>
       </div>
 
@@ -195,7 +206,7 @@ const TimeclockReports = () => {
 
       {/* Filters */}
       <div className="ios-card p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-ios-gray-700 mb-1">Von</label>
             <input
@@ -241,19 +252,6 @@ const TimeclockReports = () => {
                 <option key={e.id} value={e.id}>{e.name}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ios-gray-700 mb-1">Suche</label>
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ios-gray-400" />
-              <input
-                type="text"
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                placeholder="Name oder Code..."
-                className="ios-input pl-10"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -301,7 +299,9 @@ const TimeclockReports = () => {
                     <tr key={entry.id} className="hover:bg-ios-gray-50">
                       <td className="px-6 py-4">
                         <div>
-                          <p className="text-sm font-medium text-ios-gray-900">{entry.staff_name}</p>
+                          <p className="text-sm font-medium text-ios-gray-900">
+                            {entry.first_name} {entry.last_name}
+                          </p>
                           <p className="text-xs text-ios-gray-500">{entry.personal_code}</p>
                         </div>
                       </td>
@@ -388,9 +388,3 @@ const TimeclockReports = () => {
 };
 
 export default TimeclockReports;
-
-
-
-
-
-

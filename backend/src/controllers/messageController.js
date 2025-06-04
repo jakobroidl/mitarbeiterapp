@@ -1,7 +1,7 @@
 // backend/src/controllers/messageController.js
 const db = require('../config/database');
 const { validationResult } = require('express-validator');
-const { sendNewMessageNotification, sendBulkEmail } = require('../services/emailService');
+const { sendNewMessageNotification } = require('../services/emailService');
 
 // Alle Nachrichten abrufen (Posteingang)
 const getMessages = async (req, res) => {
@@ -145,7 +145,8 @@ const getMessage = async (req, res) => {
   }
 };
 
-// Neue Nachricht senden
+// backend/src/controllers/messageController.js - sendMessage function with optional email
+// Replace the sendMessage function with this final version:
 const sendMessage = async (req, res) => {
   const connection = await db.getConnection();
   
@@ -154,6 +155,7 @@ const sendMessage = async (req, res) => {
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await connection.rollback();
       return res.status(400).json({ 
         message: 'Validierungsfehler', 
         errors: errors.array() 
@@ -181,9 +183,8 @@ const sendMessage = async (req, res) => {
     let recipients = [];
     
     if (send_to_all) {
-      // An alle aktiven Mitarbeiter
       const [allStaff] = await connection.execute(`
-        SELECT u.id as user_id, u.email, sp.first_name
+        SELECT u.id as user_id, u.email, COALESCE(sp.first_name, 'User') as first_name
         FROM users u
         LEFT JOIN staff_profiles sp ON u.id = sp.user_id
         WHERE u.is_active = 1 AND u.role IN ('staff', 'admin') AND u.id != ?
@@ -192,13 +193,12 @@ const sendMessage = async (req, res) => {
       recipients = allStaff.map(s => ({
         user_id: s.user_id,
         email: s.email,
-        firstName: s.first_name || 'Mitarbeiter'
+        firstName: s.first_name
       }));
     } else if (recipient_ids && recipient_ids.length > 0) {
-      // An ausgewählte Empfänger
       const placeholders = recipient_ids.map(() => '?').join(',');
       const [selectedStaff] = await connection.execute(`
-        SELECT u.id as user_id, u.email, sp.first_name
+        SELECT u.id as user_id, u.email, COALESCE(sp.first_name, 'User') as first_name
         FROM users u
         LEFT JOIN staff_profiles sp ON u.id = sp.user_id
         WHERE u.id IN (${placeholders}) AND u.is_active = 1
@@ -207,7 +207,7 @@ const sendMessage = async (req, res) => {
       recipients = selectedStaff.map(s => ({
         user_id: s.user_id,
         email: s.email,
-        firstName: s.first_name || 'Mitarbeiter'
+        firstName: s.first_name
       }));
     }
     
@@ -219,29 +219,47 @@ const sendMessage = async (req, res) => {
     }
     
     // Erstelle Empfänger-Einträge
-    const recipientValues = recipients.map(r => [messageId, r.user_id]);
-    await connection.query(
-      'INSERT INTO message_recipients (message_id, recipient_id) VALUES ?',
-      [recipientValues]
-    );
+    for (const recipient of recipients) {
+      await connection.execute(
+        'INSERT INTO message_recipients (message_id, recipient_id) VALUES (?, ?)',
+        [messageId, recipient.user_id]
+      );
+    }
     
-    // Sende E-Mail-Benachrichtigungen
-    const emailRecipients = recipients.map(r => ({
-      email: r.email,
-      firstName: r.firstName
-    }));
+    // Versuche E-Mail-Benachrichtigungen zu senden (optional)
+    // Prüfe ob E-Mail-Service verfügbar ist
+    const emailServiceAvailable = process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS;
     
-    // Asynchron senden
-    sendBulkEmail(
-      emailRecipients,
-      'Neue Nachricht: {{subject}}',
-      'Hallo {{firstName}},\n\nSie haben eine neue Nachricht mit dem Betreff "{{subject}}" erhalten.\n\nBitte melden Sie sich in der App an, um die Nachricht zu lesen.',
-      '<p>Hallo {{firstName}},</p><p>Sie haben eine neue Nachricht mit dem Betreff "<strong>{{subject}}</strong>" erhalten.</p><p>Bitte melden Sie sich in der App an, um die Nachricht zu lesen.</p>'
-    ).then(results => {
-      console.log('E-Mail-Versand abgeschlossen:', results.filter(r => r.success).length, 'erfolgreich');
-    }).catch(err => {
-      console.error('Fehler beim E-Mail-Versand:', err);
-    });
+    if (emailServiceAvailable) {
+      // Sende E-Mails asynchron im Hintergrund
+      setImmediate(async () => {
+        console.log('Sending email notifications...');
+        
+        // Prüfe ob sendNewMessageNotification existiert
+        try {
+          const { sendNewMessageNotification } = require('../services/emailService');
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const recipient of recipients) {
+            try {
+              await sendNewMessageNotification(recipient.email, recipient.firstName, subject);
+              successCount++;
+            } catch (emailError) {
+              errorCount++;
+              console.error(`Failed to send email to ${recipient.email}:`, emailError.message);
+            }
+          }
+          
+          console.log(`Email notifications completed: ${successCount} sent, ${errorCount} failed`);
+        } catch (requireError) {
+          console.log('Email service not available:', requireError.message);
+        }
+      });
+    } else {
+      console.log('Email service not configured - skipping notifications');
+    }
     
     // Aktivitätslog
     await connection.execute(
@@ -254,7 +272,7 @@ const sendMessage = async (req, res) => {
           subject,
           recipientCount: recipients.length,
           priority,
-          isGlobal: send_to_all
+          isGlobal: send_to_all || false
         })
       ]
     );
@@ -264,20 +282,25 @@ const sendMessage = async (req, res) => {
     res.status(201).json({
       message: 'Nachricht erfolgreich gesendet',
       messageId,
-      recipientCount: recipients.length
+      recipientCount: recipients.length,
+      emailNotifications: emailServiceAvailable ? 'queued' : 'disabled'
     });
     
   } catch (error) {
     await connection.rollback();
     console.error('Fehler beim Senden der Nachricht:', error);
     res.status(500).json({ 
-      message: 'Fehler beim Senden der Nachricht' 
+      message: 'Fehler beim Senden der Nachricht',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
     connection.release();
   }
 };
 
+
+
+ 
 // Nachricht als gelesen markieren
 const markAsRead = async (req, res) => {
   try {

@@ -61,6 +61,7 @@ router.get('/my', requireStaff, timeclockController.getMyTimeEntries);
 // Admin Routes
 router.get('/', requireAdmin, timeclockController.getAllTimeEntries);
 router.get('/report', requireAdmin, timeclockController.generateTimeReport);
+router.get('/export', requireAdmin, timeclockController.exportTimeEntries);
 
 router.post('/manual',
   requireAdmin,

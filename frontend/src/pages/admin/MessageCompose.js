@@ -1,351 +1,334 @@
+// frontend/src/pages/admin/MessageCompose.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeftIcon,
-  EnvelopeIcon,
+  PaperAirplaneIcon,
+  XMarkIcon,
   UserGroupIcon,
-  ExclamationTriangleIcon,
-  SparklesIcon,
-  PaperAirplaneIcon
+  ExclamationCircleIcon,
+  MagnifyingGlassIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 
 const MessageCompose = () => {
   const navigate = useNavigate();
-  const [recipients, setRecipients] = useState('all');
-  const [selectedStaff, setSelectedStaff] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState('');
-  const [staff, setStaff] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch
-  } = useForm({
-    defaultValues: {
-      subject: '',
-      content: '',
-      priority: 'normal'
-    }
+  const [sending, setSending] = useState(false);
+  const [recipients, setRecipients] = useState([]);
+  const [selectedRecipients, setSelectedRecipients] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sendToAll, setSendToAll] = useState(false);
+  const [message, setMessage] = useState({
+    subject: '',
+    content: '',
+    priority: 'normal'
   });
 
   useEffect(() => {
-    loadOptions();
-  }, []);
+    loadRecipients();
+  }, [searchQuery]);
 
-  const loadOptions = async () => {
+  const loadRecipients = async () => {
     try {
-      const [staffRes, eventsRes] = await Promise.all([
-        api.get('/staff?status=active'),
-        api.get('/events?status=published&upcoming=true')
-      ]);
-      
-      setStaff(staffRes.data.staff);
-      setEvents(eventsRes.data.events);
+      const params = searchQuery ? `?search=${searchQuery}` : '';
+      const response = await api.get(`/messages/recipients${params}`);
+      setRecipients(response.data.recipients);
     } catch (error) {
-      console.error('Fehler beim Laden der Optionen:', error);
+      console.error('Fehler beim Laden der Empfänger:', error);
     }
   };
 
-  const onSubmit = async (data) => {
-    setLoading(true);
-    
-    try {
-      let recipientData = {};
-      
-      switch (recipients) {
-        case 'all':
-          recipientData = { recipient_type: 'all' };
-          break;
-        case 'active':
-          recipientData = { recipient_type: 'active' };
-          break;
-        case 'specific':
-          if (selectedStaff.length === 0) {
-            toast.error('Bitte wählen Sie mindestens einen Empfänger');
-            setLoading(false);
-            return;
-          }
-          recipientData = { 
-            recipient_type: 'specific',
-            recipient_ids: selectedStaff 
-          };
-          break;
-        case 'event':
-          if (!selectedEvent) {
-            toast.error('Bitte wählen Sie eine Veranstaltung');
-            setLoading(false);
-            return;
-          }
-          recipientData = { 
-            recipient_type: 'event',
-            event_id: selectedEvent 
-          };
-          break;
-      }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
+    if (!message.subject.trim()) {
+      toast.error('Bitte geben Sie einen Betreff ein');
+      return;
+    }
+
+    if (!message.content.trim()) {
+      toast.error('Bitte geben Sie einen Nachrichtentext ein');
+      return;
+    }
+
+    if (!sendToAll && selectedRecipients.length === 0) {
+      toast.error('Bitte wählen Sie mindestens einen Empfänger');
+      return;
+    }
+
+    setSending(true);
+
+    try {
       await api.post('/messages/send', {
-        ...data,
-        ...recipientData
+        subject: message.subject,
+        content: message.content,
+        priority: message.priority,
+        send_to_all: sendToAll,
+        recipient_ids: sendToAll ? [] : selectedRecipients.map(r => r.id)
       });
-      
+
       toast.success('Nachricht erfolgreich gesendet');
       navigate('/admin/messages');
     } catch (error) {
-      console.error('Fehler beim Senden:', error);
-      toast.error('Fehler beim Senden der Nachricht');
+      console.error('Fehler beim Senden der Nachricht:', error);
+      toast.error(error.response?.data?.message || 'Fehler beim Senden der Nachricht');
     } finally {
-      setLoading(false);
+      setSending(false);
     }
+  };
+
+  const toggleRecipient = (recipient) => {
+    setSelectedRecipients(prev => {
+      const exists = prev.find(r => r.id === recipient.id);
+      if (exists) {
+        return prev.filter(r => r.id !== recipient.id);
+      } else {
+        return [...prev, recipient];
+      }
+    });
+  };
+
+  const selectAllVisible = () => {
+    const newRecipients = [...selectedRecipients];
+    recipients.forEach(recipient => {
+      if (!newRecipients.find(r => r.id === recipient.id)) {
+        newRecipients.push(recipient);
+      }
+    });
+    setSelectedRecipients(newRecipients);
+  };
+
+  const clearSelection = () => {
+    setSelectedRecipients([]);
+    setSendToAll(false);
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center space-x-4 mb-6">
-        <button
-          onClick={() => navigate('/admin/messages')}
-          className="p-2 rounded-lg hover:bg-ios-gray-100"
-        >
-          <ArrowLeftIcon className="h-5 w-5 text-ios-gray-600" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-ios-gray-900">Neue Nachricht</h1>
-          <p className="text-ios-gray-600">Senden Sie eine Nachricht an Ihre Mitarbeiter</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-ios-gray-900">Neue Nachricht</h1>
+        <p className="text-ios-gray-600">Senden Sie eine Nachricht an Mitarbeiter</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Recipients */}
         <div className="ios-card p-6">
-          <h2 className="text-lg font-semibold text-ios-gray-900 mb-4 flex items-center">
-            <UserGroupIcon className="h-5 w-5 mr-2" />
-            Empfänger
-          </h2>
-
-          <div className="space-y-3">
-            <label className="flex items-center p-3 rounded-xl border-2 cursor-pointer hover:bg-ios-gray-50">
+          <h2 className="text-lg font-semibold text-ios-gray-900 mb-4">Empfänger</h2>
+          
+          <div className="flex items-center mb-4">
+            <label className="flex items-center">
               <input
-                type="radio"
-                value="all"
-                checked={recipients === 'all'}
-                onChange={(e) => setRecipients(e.target.value)}
-                className="h-4 w-4 text-ios-blue"
+                type="checkbox"
+                checked={sendToAll}
+                onChange={(e) => {
+                  setSendToAll(e.target.checked);
+                  if (e.target.checked) {
+                    setSelectedRecipients([]);
+                  }
+                }}
+                className="rounded border-ios-gray-300 text-ios-blue focus:ring-ios-blue"
               />
-              <div className="ml-3">
-                <p className="font-medium text-ios-gray-900">Alle Mitarbeiter</p>
-                <p className="text-sm text-ios-gray-500">Nachricht an alle Mitarbeiter senden</p>
-              </div>
+              <span className="ml-2 text-sm font-medium text-ios-gray-700">
+                An alle Mitarbeiter senden
+              </span>
             </label>
-
-            <label className="flex items-center p-3 rounded-xl border-2 cursor-pointer hover:bg-ios-gray-50">
-              <input
-                type="radio"
-                value="active"
-                checked={recipients === 'active'}
-                onChange={(e) => setRecipients(e.target.value)}
-                className="h-4 w-4 text-ios-blue"
-              />
-              <div className="ml-3">
-                <p className="font-medium text-ios-gray-900">Aktive Mitarbeiter</p>
-                <p className="text-sm text-ios-gray-500">Nur an aktive Mitarbeiter senden</p>
-              </div>
-            </label>
-
-            <label className="flex items-center p-3 rounded-xl border-2 cursor-pointer hover:bg-ios-gray-50">
-              <input
-                type="radio"
-                value="event"
-                checked={recipients === 'event'}
-                onChange={(e) => setRecipients(e.target.value)}
-                className="h-4 w-4 text-ios-blue"
-              />
-              <div className="ml-3">
-                <p className="font-medium text-ios-gray-900">Event-Teilnehmer</p>
-                <p className="text-sm text-ios-gray-500">An Teilnehmer einer Veranstaltung</p>
-              </div>
-            </label>
-
-            {recipients === 'event' && (
-              <div className="ml-7 mt-2">
-                <select
-                  value={selectedEvent}
-                  onChange={(e) => setSelectedEvent(e.target.value)}
-                  className="ios-input"
-                >
-                  <option value="">Veranstaltung wählen...</option>
-                  {events.map(event => (
-                    <option key={event.id} value={event.id}>{event.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <label className="flex items-center p-3 rounded-xl border-2 cursor-pointer hover:bg-ios-gray-50">
-              <input
-                type="radio"
-                value="specific"
-                checked={recipients === 'specific'}
-                onChange={(e) => setRecipients(e.target.value)}
-                className="h-4 w-4 text-ios-blue"
-              />
-              <div className="ml-3">
-                <p className="font-medium text-ios-gray-900">Bestimmte Mitarbeiter</p>
-                <p className="text-sm text-ios-gray-500">Mitarbeiter einzeln auswählen</p>
-              </div>
-            </label>
-
-            {recipients === 'specific' && (
-              <div className="ml-7 mt-2 max-h-48 overflow-y-auto space-y-2">
-                {staff.map((member) => (
-                  <label
-                    key={member.id}
-                    className="flex items-center p-2 rounded hover:bg-ios-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedStaff.includes(member.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedStaff([...selectedStaff, member.id]);
-                        } else {
-                          setSelectedStaff(selectedStaff.filter(id => id !== member.id));
-                        }
-                      }}
-                      className="h-4 w-4 rounded text-ios-blue"
-                    />
-                    <span className="ml-3 text-sm text-ios-gray-900">
-                      {member.first_name} {member.last_name}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
           </div>
+
+          {!sendToAll && (
+            <>
+              {/* Search */}
+              <div className="relative mb-4">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ios-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Mitarbeiter suchen..."
+                  className="ios-input pl-10"
+                />
+              </div>
+
+              {/* Selected Recipients */}
+              {selectedRecipients.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-ios-gray-700">
+                      Ausgewählt ({selectedRecipients.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="text-sm text-ios-red hover:text-red-600"
+                    >
+                      Alle entfernen
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRecipients.map((recipient) => (
+                      <span
+                        key={recipient.id}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-ios-blue/10 text-ios-blue"
+                      >
+                        {recipient.name}
+                        <button
+                          type="button"
+                          onClick={() => toggleRecipient(recipient)}
+                          className="ml-2 hover:text-ios-blue"
+                        >
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recipient List */}
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={selectAllVisible}
+                  className="w-full text-left px-3 py-2 text-sm text-ios-blue hover:bg-ios-gray-50 rounded-lg"
+                >
+                  Alle sichtbaren auswählen
+                </button>
+                {recipients.map((recipient) => {
+                  const isSelected = selectedRecipients.find(r => r.id === recipient.id);
+                  return (
+                    <button
+                      key={recipient.id}
+                      type="button"
+                      onClick={() => toggleRecipient(recipient)}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        isSelected 
+                          ? 'bg-ios-blue/10 text-ios-blue' 
+                          : 'hover:bg-ios-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{recipient.name}</span>
+                          <span className="text-sm text-ios-gray-500 ml-2">
+                            {recipient.personal_code}
+                          </span>
+                        </div>
+                        {isSelected && <CheckIcon className="h-5 w-5 text-ios-blue" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Message Content */}
+        {/* Message Details */}
         <div className="ios-card p-6">
-          <h2 className="text-lg font-semibold text-ios-gray-900 mb-4 flex items-center">
-            <EnvelopeIcon className="h-5 w-5 mr-2" />
-            Nachricht
-          </h2>
-
+          <h2 className="text-lg font-semibold text-ios-gray-900 mb-4">Nachricht</h2>
+          
           <div className="space-y-4">
             {/* Priority */}
             <div>
               <label className="block text-sm font-medium text-ios-gray-700 mb-2">
                 Priorität
               </label>
-              <select
-                {...register('priority')}
-                className="ios-input"
-              >
-                <option value="low">Niedrig</option>
-                <option value="normal">Normal</option>
-                <option value="high">Hoch</option>
-              </select>
+              <div className="flex space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="low"
+                    checked={message.priority === 'low'}
+                    onChange={(e) => setMessage({ ...message, priority: e.target.value })}
+                    className="text-ios-blue focus:ring-ios-blue"
+                  />
+                  <span className="ml-2 text-sm">Niedrig</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="normal"
+                    checked={message.priority === 'normal'}
+                    onChange={(e) => setMessage({ ...message, priority: e.target.value })}
+                    className="text-ios-blue focus:ring-ios-blue"
+                  />
+                  <span className="ml-2 text-sm">Normal</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="high"
+                    checked={message.priority === 'high'}
+                    onChange={(e) => setMessage({ ...message, priority: e.target.value })}
+                    className="text-ios-blue focus:ring-ios-blue"
+                  />
+                  <span className="ml-2 text-sm">Hoch</span>
+                </label>
+              </div>
             </div>
 
             {/* Subject */}
             <div>
               <label className="block text-sm font-medium text-ios-gray-700 mb-2">
-                Betreff *
+                Betreff
               </label>
               <input
-                {...register('subject', {
-                  required: 'Betreff ist erforderlich',
-                  maxLength: {
-                    value: 255,
-                    message: 'Maximal 255 Zeichen'
-                  }
-                })}
                 type="text"
-                className={`ios-input ${errors.subject ? 'border-ios-red' : ''}`}
-                placeholder="Betreff der Nachricht"
+                value={message.subject}
+                onChange={(e) => setMessage({ ...message, subject: e.target.value })}
+                className="ios-input"
+                placeholder="Betreff eingeben..."
+                required
               />
-              {errors.subject && (
-                <p className="mt-1 text-xs text-ios-red">{errors.subject.message}</p>
-              )}
             </div>
 
             {/* Content */}
             <div>
               <label className="block text-sm font-medium text-ios-gray-700 mb-2">
-                Nachricht *
+                Nachricht
               </label>
               <textarea
-                {...register('content', {
-                  required: 'Nachricht ist erforderlich',
-                  maxLength: {
-                    value: 5000,
-                    message: 'Maximal 5000 Zeichen'
-                  }
-                })}
-                rows={8}
-                className={`ios-input ${errors.content ? 'border-ios-red' : ''}`}
-                placeholder="Ihre Nachricht..."
+                value={message.content}
+                onChange={(e) => setMessage({ ...message, content: e.target.value })}
+                rows={10}
+                className="ios-input resize-none"
+                placeholder="Nachricht eingeben..."
+                required
               />
-              {errors.content && (
-                <p className="mt-1 text-xs text-ios-red">{errors.content.message}</p>
-              )}
-              <p className="mt-1 text-xs text-ios-gray-500">
-                {watch('content')?.length || 0} / 5000 Zeichen
+              <p className="mt-1 text-sm text-ios-gray-500">
+                {message.content.length} / 5000 Zeichen
               </p>
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex space-x-3">
+        <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => navigate('/admin/messages')}
-            className="flex-1 ios-button-secondary"
+            className="ios-button-secondary"
           >
             Abbrechen
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 ios-button-primary disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center">
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Wird gesendet...
-              </span>
-            ) : (
-              <>
-                <PaperAirplaneIcon className="h-5 w-5 mr-2" />
-                Nachricht senden
-              </>
+          
+          <div className="flex items-center space-x-3">
+            {message.priority === 'high' && (
+              <div className="flex items-center text-ios-orange">
+                <ExclamationCircleIcon className="h-5 w-5 mr-2" />
+                <span className="text-sm">Hohe Priorität</span>
+              </div>
             )}
-          </button>
+            
+            <button
+              type="submit"
+              disabled={sending}
+              className="ios-button-primary flex items-center"
+            >
+              <PaperAirplaneIcon className="h-5 w-5 mr-2" />
+              {sending ? 'Wird gesendet...' : 'Nachricht senden'}
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -353,5 +336,3 @@ const MessageCompose = () => {
 };
 
 export default MessageCompose;
-
-
