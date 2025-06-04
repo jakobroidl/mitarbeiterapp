@@ -1,136 +1,116 @@
-// backend/src/routes/timeclockRoutes.js
-const express = require('express');
-const router = express.Router();
-const { body, param } = require('express-validator');
-const timeclockController = require('../controllers/timeclockController');
+const shiftController = require('../controllers/shiftController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
-const { handleValidationErrors } = require('../middleware/validation');
+const { handleValidationErrors, isOptionalInt } = require('../middleware/validation');
 
-// Kiosk Mode Routes (keine Authentifizierung erforderlich)
-router.post('/kiosk/clock-in',
-  [
-    body('personal_code')
-      .trim()
-      .notEmpty().withMessage('Personal-Code ist erforderlich')
-      .isLength({ min: 6, max: 20 }).withMessage('Ungültiger Personal-Code'),
-    body('position_id')
-      .isInt({ min: 1 }).withMessage('Position ist erforderlich'),
-    body('event_id')
-      .optional()
-      .isInt({ min: 1 }).withMessage('Ungültige Event ID'),
-    body('kiosk_token')
-      .notEmpty().withMessage('Kiosk-Token ist erforderlich')
-  ],
-  handleValidationErrors,
-  timeclockController.kioskClockIn
-);
-
-router.post('/kiosk/clock-out',
-  [
-    body('personal_code')
-      .trim()
-      .notEmpty().withMessage('Personal-Code ist erforderlich')
-      .isLength({ min: 6, max: 20 }).withMessage('Ungültiger Personal-Code'),
-    body('kiosk_token')
-      .notEmpty().withMessage('Kiosk-Token ist erforderlich')
-  ],
-  handleValidationErrors,
-  timeclockController.kioskClockOut
-);
-
-router.get('/kiosk/status/:personal_code',
-  [
-    param('personal_code')
-      .trim()
-      .notEmpty().withMessage('Personal-Code ist erforderlich')
-      .isLength({ min: 6, max: 20 }).withMessage('Ungültiger Personal-Code')
-  ],
-  handleValidationErrors,
-  timeclockController.checkClockStatus
-);
-
-// Verfügbare Positionen (öffentlich für Kiosk)
-router.get('/positions', timeclockController.getAvailablePositions);
-
-// Authentifizierte Routes
+// Alle Shift Routes benötigen Authentifizierung
 router.use(authenticateToken);
 
 // Staff Routes
-router.get('/my', requireStaff, timeclockController.getMyTimeEntries);
+router.get('/my', requireStaff, shiftController.getMyShifts);
+router.get('/available', requireStaff, shiftController.getAvailableShifts);
+
+router.post('/:shiftId/apply',
+  requireStaff,
+  [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID')
+  ],
+  handleValidationErrors,
+  shiftController.applyForShift
+);
+
+router.delete('/:shiftId/apply',
+  requireStaff,
+  [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID')
+  ],
+  handleValidationErrors,
+  shiftController.withdrawShiftApplication
+);
+
+router.post('/:shiftId/confirm',
+  requireStaff,
+  [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID')
+  ],
+  handleValidationErrors,
+  shiftController.confirmShiftAssignment
+);
 
 // Admin Routes
-router.get('/', requireAdmin, timeclockController.getAllTimeEntries);
-router.get('/report', requireAdmin, timeclockController.generateTimeReport);
-router.get('/export', requireAdmin, timeclockController.exportTimeEntries);
-
-router.post('/manual',
+router.get('/:shiftId/applications',
   requireAdmin,
   [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID')
+  ],
+  handleValidationErrors,
+  shiftController.getShiftApplications
+);
+
+router.get('/event/:eventId/plan',
+  requireAdmin,
+  [
+    param('eventId').isInt().withMessage('Ungültige Event ID')
+  ],
+  handleValidationErrors,
+  shiftController.getEventShiftPlan
+);
+
+router.post('/:shiftId/assign',
+  requireAdmin,
+  [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID'),
     body('staff_id')
       .isInt({ min: 1 }).withMessage('Mitarbeiter ist erforderlich'),
     body('position_id')
-      .isInt({ min: 1 }).withMessage('Position ist erforderlich'),
-    body('event_id')
       .optional()
-      .isInt({ min: 1 }).withMessage('Ungültige Event ID'),
-    body('clock_in')
-      .isISO8601().withMessage('Ungültige Einstempelzeit'),
-    body('clock_out')
+      .custom(isOptionalInt).withMessage('Ungültige Position ID'),
+    body('status')
       .optional()
-      .isISO8601().withMessage('Ungültige Ausstempelzeit')
-      .custom((value, { req }) => {
-        if (value) {
-          const clockIn = new Date(req.body.clock_in);
-          const clockOut = new Date(value);
-          if (clockOut <= clockIn) {
-            throw new Error('Ausstempelzeit muss nach Einstempelzeit liegen');
-          }
-        }
-        return true;
-      }),
-    body('break_minutes')
-      .optional()
-      .isInt({ min: 0 }).withMessage('Pausenzeit muss eine positive Zahl sein'),
+      .isIn(['preliminary', 'final']).withMessage('Ungültiger Status'),
     body('notes')
       .optional()
       .trim()
       .isLength({ max: 500 }).withMessage('Notizen dürfen maximal 500 Zeichen lang sein')
   ],
   handleValidationErrors,
-  timeclockController.manualClockEntry
+  shiftController.assignStaffToShift
 );
 
-router.put('/:id',
+router.post('/:shiftId/bulk-assign',
   requireAdmin,
   [
-    param('id').isInt().withMessage('Ungültige Eintrags ID'),
-    body('clock_in')
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID'),
+    body('assignments')
+      .isArray({ min: 1 }).withMessage('Mindestens eine Zuweisung erforderlich'),
+    body('assignments.*.staff_id')
+      .isInt({ min: 1 }).withMessage('Ungültige Mitarbeiter ID'),
+    body('assignments.*.position_id')
       .optional()
-      .isISO8601().withMessage('Ungültige Einstempelzeit'),
-    body('clock_out')
-      .optional()
-      .isISO8601().withMessage('Ungültige Ausstempelzeit'),
-    body('break_minutes')
-      .optional()
-      .isInt({ min: 0 }).withMessage('Pausenzeit muss eine positive Zahl sein'),
-    body('notes')
-      .optional()
-      .trim()
-      .isLength({ max: 500 }).withMessage('Notizen dürfen maximal 500 Zeichen lang sein')
+      .custom(isOptionalInt).withMessage('Ungültige Position ID')
   ],
   handleValidationErrors,
-  timeclockController.updateTimeEntry
+  shiftController.bulkAssignStaff
 );
 
-router.delete('/:id',
+router.delete('/:shiftId/assign/:staffId',
   requireAdmin,
   [
-    param('id').isInt().withMessage('Ungültige Eintrags ID')
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID'),
+    param('staffId').isInt().withMessage('Ungültige Mitarbeiter ID')
   ],
   handleValidationErrors,
-  timeclockController.deleteTimeEntry
+  shiftController.removeShiftAssignment
+);
+
+router.patch('/:shiftId/status',
+  requireAdmin,
+  [
+    param('shiftId').isInt().withMessage('Ungültige Schicht ID'),
+    body('status')
+      .isIn(['preliminary', 'final']).withMessage('Ungültiger Status')
+  ],
+  handleValidationErrors,
+  shiftController.updateShiftAssignmentStatus
 );
 
 module.exports = router;
-
-

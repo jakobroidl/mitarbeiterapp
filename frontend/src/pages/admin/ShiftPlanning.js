@@ -86,21 +86,63 @@ const ShiftPlanning = () => {
     }));
   };
 
-  const handleAssignStaff = async (shiftId, staffId, positionId = null) => {
-    try {
-      await api.post(`/shifts/${shiftId}/assign`, {
-        staff_id: staffId,
-        position_id: positionId,
-        status: 'preliminary'
-      });
-      
-      toast.success('Mitarbeiter erfolgreich eingeteilt');
-      loadEventAndShiftPlan();
-    } catch (error) {
-      console.error('Fehler beim Einteilen:', error);
-      toast.error(error.response?.data?.message || 'Fehler beim Einteilen des Mitarbeiters');
+const handleAssignStaff = async (shiftId, staffId, positionId = null) => {
+  try {
+    // Build request data
+    const requestData = {
+      staff_id: staffId,
+      status: 'preliminary'
+    };
+    
+    // Only add position_id if it's provided and not null
+    if (positionId) {
+      requestData.position_id = positionId;
     }
-  };
+    
+    console.log('Assigning staff with data:', requestData);
+    
+    await api.post(`/shifts/${shiftId}/assign`, requestData);
+    
+    toast.success('Mitarbeiter erfolgreich eingeteilt');
+    loadEventAndShiftPlan();
+  } catch (error) {
+    console.error('Fehler beim Einteilen:', error);
+    console.error('Error response:', error.response?.data);
+    toast.error(error.response?.data?.message || 'Fehler beim Einteilen des Mitarbeiters');
+  }
+};
+
+// Also fix the bulk assign to handle position_id correctly:
+const handleBulkAssign = async (shiftId) => {
+  const staffIds = Object.entries(selectedStaff)
+    .filter(([key, value]) => key.startsWith(`${shiftId}-`) && value)
+    .map(([key]) => parseInt(key.split('-')[1]));
+
+  if (staffIds.length === 0) {
+    toast.error('Bitte wählen Sie mindestens einen Mitarbeiter aus');
+    return;
+  }
+
+  setProcessing(true);
+  try {
+    // Create assignments without position_id to avoid validation issues
+    const assignments = staffIds.map(staff_id => ({ staff_id }));
+    
+    await api.post(`/shifts/${shiftId}/bulk-assign`, {
+      assignments: assignments
+    });
+    
+    toast.success(`${staffIds.length} Mitarbeiter erfolgreich eingeteilt`);
+    setSelectedStaff({});
+    loadEventAndShiftPlan();
+  } catch (error) {
+    console.error('Fehler beim Bulk-Assign:', error);
+    toast.error('Fehler beim Einteilen der Mitarbeiter');
+  } finally {
+    setProcessing(false);
+  }
+};
+
 
   const handleRemoveAssignment = async (shiftId, staffId) => {
     if (!window.confirm('Einteilung wirklich entfernen?')) return;

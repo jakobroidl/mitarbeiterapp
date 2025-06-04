@@ -10,6 +10,9 @@ const handleValidationErrors = (req, res, next) => {
       message: error.msg
     }));
     
+    console.log('Validation errors:', errorMessages);
+    console.log('Request body:', req.body);
+    
     return res.status(400).json({
       message: 'Validierungsfehler',
       errors: errorMessages
@@ -67,10 +70,20 @@ const sanitizeInput = (value) => {
   return value;
 };
 
+// Custom validator for optional integer fields that accepts null
+const isOptionalInt = (value) => {
+  if (value === null || value === undefined || value === '') return true;
+  const num = parseInt(value);
+  return !isNaN(num) && num > 0;
+};
+
 module.exports = {
   handleValidationErrors,
   isValidGermanPhoneNumber,
   isValidPostalCode,
   isValidBirthDate,
-  sanitizeInput
+  sanitizeInput,
+  isOptionalInt
 };
+
+

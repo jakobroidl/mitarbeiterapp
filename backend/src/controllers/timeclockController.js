@@ -4,7 +4,7 @@ const { validationResult } = require('express-validator');
 const { format, differenceInMinutes, startOfDay, endOfDay, startOfMonth, endOfMonth } = require('date-fns');
 const { de } = require('date-fns/locale');
 
-// Kiosk Mode - Einstempeln
+// Kiosk Clock In
 const kioskClockIn = async (req, res) => {
   const connection = await db.getConnection();
   
@@ -13,26 +13,25 @@ const kioskClockIn = async (req, res) => {
     
     const { personal_code, position_id, event_id, kiosk_token } = req.body;
     
-    // Validiere Kiosk Token
-    const [settings] = await connection.execute(
-      'SELECT setting_value FROM settings WHERE setting_key = "kiosk_token"',
-      []
-    );
-    
-    if (!settings.length || settings[0].setting_value !== kiosk_token) {
-      await connection.rollback();
-      return res.status(401).json({ 
-        message: 'Ungültiger Kiosk-Token' 
-      });
+    // Optional: Validate kiosk token if configured
+    const expectedToken = process.env.KIOSK_TOKEN;
+    if (expectedToken && expectedToken !== 'your-secure-kiosk-token-here-change-this') {
+      // Only validate if a real token is configured
+      if (kiosk_token !== expectedToken) {
+        await connection.rollback();
+        return res.status(401).json({ 
+          message: 'Ungültiger Kiosk-Token' 
+        });
+      }
     }
     
     // Hole Mitarbeiter anhand Personal-Code
     const [staff] = await connection.execute(
-      `SELECT sp.id, sp.first_name, sp.last_name, u.is_active
+      `SELECT sp.id, sp.first_name, sp.last_name, sp.personal_code, u.is_active
        FROM staff_profiles sp
        JOIN users u ON sp.user_id = u.id
        WHERE sp.personal_code = ?`,
-      [personal_code]
+      [personal_code.toUpperCase()]
     );
     
     if (staff.length === 0) {
@@ -50,94 +49,37 @@ const kioskClockIn = async (req, res) => {
     }
     
     const staffId = staff[0].id;
-    const staffName = `${staff[0].first_name} ${staff[0].last_name}`;
     
     // Prüfe ob bereits eingestempelt
     const [activeEntries] = await connection.execute(
-      'SELECT id, clock_in FROM timeclock_entries WHERE staff_id = ? AND status = "active"',
+      'SELECT id FROM timeclock_entries WHERE staff_id = ? AND status = "active"',
       [staffId]
     );
     
     if (activeEntries.length > 0) {
       await connection.rollback();
       return res.status(400).json({ 
-        message: 'Sie sind bereits eingestempelt seit ' + format(new Date(activeEntries[0].clock_in), 'HH:mm') + ' Uhr',
-        type: 'already_clocked_in'
+        message: 'Sie sind bereits eingestempelt' 
       });
-    }
-    
-    // Prüfe Position
-    const [positions] = await connection.execute(
-      'SELECT name FROM positions WHERE id = ? AND is_active = 1',
-      [position_id]
-    );
-    
-    if (positions.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({ 
-        message: 'Ungültige Position' 
-      });
-    }
-    
-    // Wenn Event angegeben, prüfe ob Mitarbeiter zugeteilt ist
-    let eventName = null;
-    let shiftId = null;
-    
-    if (event_id) {
-      const [events] = await connection.execute(
-        `SELECT e.name 
-         FROM events e
-         JOIN event_invitations ei ON e.id = ei.event_id
-         WHERE e.id = ? AND ei.staff_id = ? AND ei.status = 'accepted'`,
-        [event_id, staffId]
-      );
-      
-      if (events.length === 0) {
-        await connection.rollback();
-        return res.status(403).json({ 
-          message: 'Sie sind nicht zu dieser Veranstaltung eingeladen' 
-        });
-      }
-      
-      eventName = events[0].name;
-      
-      // Finde aktuelle Schicht
-      const [shifts] = await connection.execute(
-        `SELECT s.id 
-         FROM shifts s
-         JOIN shift_assignments sa ON s.id = sa.shift_id
-         WHERE s.event_id = ? 
-           AND sa.staff_id = ?
-           AND NOW() BETWEEN DATE_SUB(s.start_time, INTERVAL 30 MINUTE) 
-                         AND DATE_ADD(s.end_time, INTERVAL 30 MINUTE)
-         LIMIT 1`,
-        [event_id, staffId]
-      );
-      
-      if (shifts.length > 0) {
-        shiftId = shifts[0].id;
-      }
     }
     
     // Erstelle Eintrag
     const [result] = await connection.execute(
-      `INSERT INTO timeclock_entries 
-       (staff_id, event_id, shift_id, position_id, clock_in, status)
-       VALUES (?, ?, ?, ?, NOW(), 'active')`,
-      [staffId, event_id || null, shiftId, position_id]
+      `INSERT INTO timeclock_entries (staff_id, position_id, event_id, clock_in, status) 
+       VALUES (?, ?, ?, NOW(), 'active')`,
+      [staffId, position_id, event_id || null]
     );
     
     // Aktivitätslog
     await connection.execute(
-      `INSERT INTO activity_logs (action, entity_type, entity_id, details)
-       VALUES ('clock_in', 'timeclock', ?, ?)`,
+      `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, details)
+       VALUES (NULL, 'clock_in', 'timeclock', ?, ?)`,
       [
         result.insertId,
         JSON.stringify({
-          staffId,
-          staffName,
-          position: positions[0].name,
-          event: eventName
+          staffName: `${staff[0].first_name} ${staff[0].last_name}`,
+          personalCode: personal_code,
+          method: 'kiosk'
         })
       ]
     );
@@ -145,20 +87,13 @@ const kioskClockIn = async (req, res) => {
     await connection.commit();
     
     res.json({
-      success: true,
-      message: `Willkommen ${staffName}! Eingestempelt um ${format(new Date(), 'HH:mm')} Uhr`,
-      entry: {
-        id: result.insertId,
-        staff_name: staffName,
-        position: positions[0].name,
-        event: eventName,
-        clock_in: new Date()
-      }
+      message: `Erfolgreich eingestempelt - ${staff[0].first_name} ${staff[0].last_name}`,
+      entry_id: result.insertId
     });
     
   } catch (error) {
     await connection.rollback();
-    console.error('Fehler beim Einstempeln:', error);
+    console.error('Fehler beim Kiosk Clock-In:', error);
     res.status(500).json({ 
       message: 'Fehler beim Einstempeln' 
     });
@@ -167,7 +102,7 @@ const kioskClockIn = async (req, res) => {
   }
 };
 
-// Kiosk Mode - Ausstempeln
+// Kiosk Clock Out
 const kioskClockOut = async (req, res) => {
   const connection = await db.getConnection();
   
@@ -176,19 +111,21 @@ const kioskClockOut = async (req, res) => {
     
     const { personal_code, kiosk_token } = req.body;
     
-    // Validiere Kiosk Token
-    const [settings] = await connection.execute(
-      'SELECT setting_value FROM settings WHERE setting_key = "kiosk_token"',
-      []
-    );
-    
-    if (!settings.length || settings[0].setting_value !== kiosk_token) {
-      await connection.rollback();
-      return res.status(401).json({ 
-        message: 'Ungültiger Kiosk-Token' 
-      });
+    // Optional: Validate kiosk token if configured
+    const expectedToken = process.env.KIOSK_TOKEN;
+    if (expectedToken && expectedToken !== 'your-secure-kiosk-token-here-change-this') {
+      // Only validate if a real token is configured
+      if (kiosk_token !== expectedToken) {
+        await connection.rollback();
+        return res.status(401).json({ 
+          message: 'Ungültiger Kiosk-Token' 
+        });
+      }
     }
     
+
+
+
     // Hole Mitarbeiter
     const [staff] = await connection.execute(
       `SELECT sp.id, sp.first_name, sp.last_name

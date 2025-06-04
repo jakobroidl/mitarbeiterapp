@@ -4,7 +4,7 @@ const router = express.Router();
 const { body, param } = require('express-validator');
 const shiftController = require('../controllers/shiftController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
-const { handleValidationErrors } = require('../middleware/validation');
+const { handleValidationErrors, isOptionalInt } = require('../middleware/validation');
 
 // Alle Shift Routes benötigen Authentifizierung
 router.use(authenticateToken);
@@ -67,7 +67,7 @@ router.post('/:shiftId/assign',
       .isInt({ min: 1 }).withMessage('Mitarbeiter ist erforderlich'),
     body('position_id')
       .optional()
-      .isInt({ min: 1 }).withMessage('Ungültige Position ID'),
+      .custom(isOptionalInt).withMessage('Ungültige Position ID'),
     body('status')
       .optional()
       .isIn(['preliminary', 'final']).withMessage('Ungültiger Status'),
@@ -90,7 +90,7 @@ router.post('/:shiftId/bulk-assign',
       .isInt({ min: 1 }).withMessage('Ungültige Mitarbeiter ID'),
     body('assignments.*.position_id')
       .optional()
-      .isInt({ min: 1 }).withMessage('Ungültige Position ID')
+      .custom(isOptionalInt).withMessage('Ungültige Position ID')
   ],
   handleValidationErrors,
   shiftController.bulkAssignStaff
@@ -118,4 +118,3 @@ router.patch('/:shiftId/status',
 );
 
 module.exports = router;
-
