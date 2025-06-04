@@ -371,6 +371,7 @@ const removeShiftAssignment = async (req, res) => {
 };
 
 // Schichtstatus ändern (vorläufig -> endgültig)
+
 const updateShiftAssignmentStatus = async (req, res) => {
   const connection = await db.getConnection();
   
@@ -378,12 +379,18 @@ const updateShiftAssignmentStatus = async (req, res) => {
     await connection.beginTransaction();
     
     const { shiftId } = req.params;
-    const { status } = req.body; // 'preliminary' oder 'final'
+    const { status } = req.body;
     const adminId = req.user.id;
     
+    console.log('=== UPDATE SHIFT STATUS ===');
+    console.log('Shift ID:', shiftId);
+    console.log('New Status:', status);
+    console.log('Admin ID:', adminId);
+    
     if (!['preliminary', 'final'].includes(status)) {
+      await connection.rollback();
       return res.status(400).json({ 
-        message: 'Ungültiger Status' 
+        message: 'Ungültiger Status. Erlaubt sind: preliminary, final' 
       });
     }
     
@@ -404,25 +411,48 @@ const updateShiftAssignmentStatus = async (req, res) => {
     }
     
     const shift = shifts[0];
+    console.log('Found shift:', shift.name);
     
-    // Update alle Zuweisungen dieser Schicht
+    // Hole aktuelle Assignments vor dem Update
+    const [currentAssignments] = await connection.execute(
+      'SELECT id, staff_id, status FROM shift_assignments WHERE shift_id = ?',
+      [shiftId]
+    );
+    console.log('Current assignments:', currentAssignments.length);
+    console.log('Current statuses:', currentAssignments.map(a => a.status));
+    
+    // Update alle Zuweisungen dieser Schicht (außer bereits bestätigte)
     const [result] = await connection.execute(
       `UPDATE shift_assignments 
-       SET status = ? 
+       SET status = ?
        WHERE shift_id = ? AND status != 'confirmed'`,
       [status, shiftId]
     );
     
-    // Hole betroffene Mitarbeiter für E-Mails
+    console.log('Update result:', {
+      affectedRows: result.affectedRows,
+      changedRows: result.changedRows
+    });
+    
+    // Hole aktualisierte Assignments
+    const [updatedAssignments] = await connection.execute(
+      'SELECT id, staff_id, status FROM shift_assignments WHERE shift_id = ?',
+      [shiftId]
+    );
+    console.log('Updated statuses:', updatedAssignments.map(a => a.status));
+    
+   /* // Hole betroffene Mitarbeiter für E-Mails
     if (status === 'final' && result.affectedRows > 0) {
       const [staffList] = await connection.execute(
-        `SELECT sp.first_name, u.email
+       `SELECT sp.first_name, u.email
          FROM shift_assignments sa
          JOIN staff_profiles sp ON sa.staff_id = sp.id
          JOIN users u ON sp.user_id = u.id
          WHERE sa.shift_id = ? AND sa.status = 'final'`,
         [shiftId]
       );
+    
+      console.log(`Sending emails to ${staffList.length} staff members`);
       
       // Sende E-Mails asynchron
       for (const staff of staffList) {
@@ -434,8 +464,8 @@ const updateShiftAssignmentStatus = async (req, res) => {
         ).catch(err => console.error('E-Mail Fehler:', err));
       }
     }
-    
-    // Aktivitätslog
+    */
+    //Aktivitätslog
     await connection.execute(
       `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, details)
        VALUES (?, 'shift_status_changed', 'shift', ?, ?)`,
@@ -446,28 +476,36 @@ const updateShiftAssignmentStatus = async (req, res) => {
           shiftName: shift.name,
           eventName: shift.event_name,
           newStatus: status,
-          affectedAssignments: result.affectedRows
+          affectedAssignments: result.affectedRows,
+          changedAssignments: result.changedRows
         })
       ]
     );
     
     await connection.commit();
+    console.log('=== SHIFT STATUS UPDATE COMPLETE ===');
     
     res.json({
       message: `Schichtstatus erfolgreich auf '${status === 'final' ? 'Endgültig' : 'Vorläufig'}' geändert`,
-      affectedAssignments: result.affectedRows
+      affectedAssignments: result.affectedRows,
+      changedAssignments: result.changedRows,
+      newStatus: status
     });
     
   } catch (error) {
     await connection.rollback();
     console.error('Fehler beim Ändern des Schichtstatus:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
-      message: 'Fehler beim Ändern des Status' 
+      message: 'Fehler beim Ändern des Status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
     connection.release();
   }
 };
+
+
 
 // Schichtplan für Event abrufen
 const getEventShiftPlan = async (req, res) => {

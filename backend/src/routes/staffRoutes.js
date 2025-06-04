@@ -124,6 +124,15 @@ router.post('/:id/reset-password',
   staffController.resetStaffPassword
 );
 
+// Staff Schichten Routes - Weiterleitung an shiftController
+const shiftController = require('../controllers/shiftController');
+router.get('/shifts/my', requireStaff, shiftController.getMyShifts);
+router.get('/shifts/available', requireStaff, shiftController.getAvailableShifts);
+router.post('/shifts/:shiftId/apply', requireStaff, shiftController.applyForShift);
+router.delete('/shifts/:shiftId/apply', requireStaff, shiftController.withdrawShiftApplication);
+router.post('/shifts/:shiftId/confirm', requireStaff, shiftController.confirmShiftAssignment);
+
+
 module.exports = router;
 
 
