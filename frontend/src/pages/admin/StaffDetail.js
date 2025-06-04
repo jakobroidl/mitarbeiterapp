@@ -22,7 +22,8 @@ import {
   TrashIcon,
   ChartBarIcon,
   ExclamationTriangleIcon,
-  CameraIcon
+  CameraIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 
 const StaffDetail = () => {
