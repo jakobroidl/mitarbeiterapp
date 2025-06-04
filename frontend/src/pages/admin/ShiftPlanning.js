@@ -112,38 +112,6 @@ const handleAssignStaff = async (shiftId, staffId, positionId = null) => {
   }
 };
 
-// Also fix the bulk assign to handle position_id correctly:
-const handleBulkAssign = async (shiftId) => {
-  const staffIds = Object.entries(selectedStaff)
-    .filter(([key, value]) => key.startsWith(`${shiftId}-`) && value)
-    .map(([key]) => parseInt(key.split('-')[1]));
-
-  if (staffIds.length === 0) {
-    toast.error('Bitte wählen Sie mindestens einen Mitarbeiter aus');
-    return;
-  }
-
-  setProcessing(true);
-  try {
-    // Create assignments without position_id to avoid validation issues
-    const assignments = staffIds.map(staff_id => ({ staff_id }));
-    
-    await api.post(`/shifts/${shiftId}/bulk-assign`, {
-      assignments: assignments
-    });
-    
-    toast.success(`${staffIds.length} Mitarbeiter erfolgreich eingeteilt`);
-    setSelectedStaff({});
-    loadEventAndShiftPlan();
-  } catch (error) {
-    console.error('Fehler beim Bulk-Assign:', error);
-    toast.error('Fehler beim Einteilen der Mitarbeiter');
-  } finally {
-    setProcessing(false);
-  }
-};
-
-
   const handleRemoveAssignment = async (shiftId, staffId) => {
     if (!window.confirm('Einteilung wirklich entfernen?')) return;
 

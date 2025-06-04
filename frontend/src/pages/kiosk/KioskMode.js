@@ -84,7 +84,7 @@ const KioskMode = () => {
 
   const handleCodeSubmit = async (e) => {
     e.preventDefault();
-    if (!personalCode || personalCode.length < 6) return;
+    if (!personalCode || personalCode.length < 3) return;
 
     setLoading(true);
     try {
@@ -116,12 +116,18 @@ const KioskMode = () => {
 
     setLoading(true);
     try {
-      const response = await api.post('/timeclock/kiosk/clock-in', {
+      const requestData = {
         personal_code: personalCode,
         position_id: selectedPosition,
-        event_id: selectedEvent,
         kiosk_token: kioskToken
-      });
+      };
+      
+      // Nur event_id hinzufügen, wenn es einen Wert hat
+      if (selectedEvent) {
+        requestData.event_id = selectedEvent;
+      }
+      
+      const response = await api.post('/timeclock/kiosk/clock-in', requestData);
 
       setMessage(response.data.message);
       setMessageType('success');
@@ -138,10 +144,12 @@ const KioskMode = () => {
   const handleClockOut = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/timeclock/kiosk/clock-out', {
+      const requestData = {
         personal_code: personalCode,
         kiosk_token: kioskToken
-      });
+      };
+      
+      const response = await api.post('/timeclock/kiosk/clock-out', requestData);
 
       setMessage(response.data.message);
       setMessageType('success');
@@ -199,7 +207,7 @@ const KioskMode = () => {
             
             <button
               type="submit"
-              disabled={loading || personalCode.length < 6}
+              disabled={loading || personalCode.length < 3}
               className="w-full mt-6 py-4 bg-ios-blue text-white text-xl font-semibold rounded-2xl
                        hover:bg-blue-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
                        transition-all duration-200"
@@ -434,3 +442,5 @@ const KioskMode = () => {
 };
 
 export default KioskMode;
+
+

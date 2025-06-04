@@ -104,11 +104,12 @@ router.patch('/:id/personal-code',
   requireAdmin,
   [
     param('id').isInt().withMessage('Ungültige Mitarbeiter ID'),
-    body('personal_code')
-      .trim()
-      .notEmpty().withMessage('Personal-Code ist erforderlich')
-      .isLength({ min: 6, max: 20 }).withMessage('Personal-Code muss zwischen 6 und 20 Zeichen lang sein')
-      .matches(/^[A-Z0-9]+$/).withMessage('Personal-Code darf nur Großbuchstaben und Zahlen enthalten')
+   body('personal_code')
+  .trim()
+  .notEmpty().withMessage('Personal-Code ist erforderlich')
+  .isLength({ min: 6, max: 20 }).withMessage('Personal-Code muss zwischen 6 und 20 Zeichen lang sein')
+  .matches(/^[0-9]+$/).withMessage('Personal-Code darf nur Zahlen enthalten')
+
   ],
   handleValidationErrors,
   staffController.updatePersonalCode

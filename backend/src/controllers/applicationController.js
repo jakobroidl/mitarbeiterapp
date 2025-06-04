@@ -6,43 +6,29 @@ const { validationResult } = require('express-validator');
 const { sendApplicationAcceptedEmail, sendApplicationRejectedEmail } = require('../services/emailService');
 const { deleteFile, getFileUrl } = require('../middleware/upload');
 
+
+
 // Generiere einen eindeutigen Personal-Code
+// Funktion zur Generierung eines eindeutigen numerischen Personal-Codes
 const generatePersonalCode = async (connection) => {
-  console.log('[generatePersonalCode] Starting...');
   let code;
-  let exists = true;
-  let attempts = 0;
+  let isUnique = false;
   
-  while (exists && attempts < 10) {
-    // Format: Erste 3 Buchstaben + 3 Zufallszahlen (z.B. EVT123)
-    const letters = 'EVT';
-    const numbers = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    code = letters + numbers;
-    
-    console.log(`[generatePersonalCode] Trying code: ${code}`);
+  while (!isUnique) {
+    // Generiere 6-stelligen numerischen Code
+    code = Math.floor(100000 + Math.random() * 900000).toString();
     
     // Prüfe ob Code bereits existiert
-    try {
-      const [result] = await connection.execute(
-        'SELECT COUNT(*) as count FROM staff_profiles WHERE personal_code = ?',
-        [code]
-      );
-      
-      exists = result[0].count > 0;
-      console.log(`[generatePersonalCode] Code ${code} exists: ${exists}`);
-    } catch (error) {
-      console.error('[generatePersonalCode] Database error:', error);
-      throw error;
-    }
+    const [existing] = await connection.execute(
+      'SELECT id FROM staff_profiles WHERE personal_code = ?',
+      [code]
+    );
     
-    attempts++;
+    if (existing.length === 0) {
+      isUnique = true;
+    }
   }
   
-  if (attempts >= 10) {
-    throw new Error('Konnte keinen eindeutigen Personal-Code generieren');
-  }
-  
-  console.log(`[generatePersonalCode] Generated unique code: ${code}`);
   return code;
 };
 
