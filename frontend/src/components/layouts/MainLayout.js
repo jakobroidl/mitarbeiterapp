@@ -16,7 +16,8 @@ import {
   DocumentTextIcon,
   MapPinIcon,
   BellIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 const MainLayout = () => {
@@ -39,11 +40,13 @@ const MainLayout = () => {
     { name: 'Dashboard', href: '/staff/dashboard', icon: HomeIcon },
     { name: 'Mein Kalender', href: '/staff/schedule', icon: CalendarIcon },
     { name: 'Meine Schichten', href: '/staff/shifts', icon: ClockIcon },
+    { name: 'Schichten finden', href: '/staff/shifts/available', icon: MagnifyingGlassIcon },
     { name: 'Einladungen', href: '/staff/invitations', icon: BellIcon },
     { name: 'Stempeluhr', href: '/staff/timeclock', icon: ChartBarIcon },
     { name: 'Nachrichten', href: '/staff/messages', icon: EnvelopeIcon },
     { name: 'Mein Profil', href: '/staff/profile', icon: UserCircleIcon },
   ];
+
 
   const navigation = isAdmin() ? adminNavigation : staffNavigation;
 

@@ -14,7 +14,7 @@ import {
   ExclamationTriangleIcon,
   DocumentTextIcon,
   MapPinIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, isToday, isTomorrow, parseISO, differenceInHours } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -357,6 +357,13 @@ const StaffDashboard = () => {
         <h2 className="text-lg font-semibold text-ios-gray-900 mb-4">Schnellzugriff</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link
+            to="/staff/shifts/available"
+            className="flex flex-col items-center p-4 rounded-xl bg-ios-blue/10 hover:bg-ios-blue/20 transition-colors border-2 border-ios-blue/20"
+          >
+            <CalendarDaysIcon className="h-8 w-8 text-ios-blue mb-2" />
+            <span className="text-sm font-medium text-ios-gray-900">Schichten finden</span>
+          </Link>
+          <Link
             to="/staff/timeclock"
             className="flex flex-col items-center p-4 rounded-xl bg-ios-gray-50 hover:bg-ios-gray-100 transition-colors"
           >
@@ -386,6 +393,7 @@ const StaffDashboard = () => {
           </Link>
         </div>
       </div>
+
     </div>
   );
 };
