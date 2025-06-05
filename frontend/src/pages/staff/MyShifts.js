@@ -1,10 +1,7 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+// frontend/src/pages/staff/MyShifts.js
+import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { format, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
-
 import {
   CalendarIcon,
   ClockIcon,
@@ -18,117 +15,134 @@ import {
   FunnelIcon,
   ArrowPathIcon,
   XMarkIcon,
-  DocumentTextIcon,
-  EyeIcon
+  EyeIcon,
+  CalendarDaysIcon,
+  UserGroupIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 
-
-const MyShiftsEnhanced = () => {
-  const [shifts, setShifts] = useState([
-    {
-      id: 1,
-      shift_name: "Frühdienst Bar",
-      event_name: "Sommerfest 2024",
-      location: "Stadtpark München",
-      start_time: "2024-06-20T08:00:00",
-      end_time: "2024-06-20T16:00:00",
-      position_name: "Bar",
-      status: "final",
-      confirmed_at: null,
-      required_qualifications: "Barkeeper, Kassierer",
-      my_qualifications: ["Barkeeper", "Kassierer", "Security"],
-      qualification_match: { has: 2, required: 2, fully_qualified: true }
-    },
-    {
-      id: 2,
-      shift_name: "Spätdienst Einlass",
-      event_name: "Stadtfest 2024",
-      location: "Marktplatz",
-      start_time: "2024-06-25T16:00:00",
-      end_time: "2024-06-26T00:00:00",
-      position_name: "Einlass",
-      status: "confirmed",
-      confirmed_at: "2024-06-15T14:30:00",
-      required_qualifications: "Security, Einlass",
-      my_qualifications: ["Security"],
-      qualification_match: { has: 1, required: 2, fully_qualified: false }
-    },
-    {
-      id: 3,
-      shift_name: "Ganztagesschicht",
-      event_name: "Musikfestival",
-      location: "Olympiapark",
-      start_time: "2024-07-01T10:00:00",
-      end_time: "2024-07-01T22:00:00",
-      position_name: "Kasse",
-      status: "preliminary",
-      confirmed_at: null,
-      required_qualifications: "Kassierer",
-      my_qualifications: ["Kassierer"],
-      qualification_match: { has: 1, required: 1, fully_qualified: true }
-    }
-  ]);
-
-  const [availableShifts, setAvailableShifts] = useState([
-    {
-      id: 4,
-      shift_name: "Frühdienst Security",
-      event_name: "Open Air Festival",
-      location: "Theresienwiese",
-      start_time: "2024-07-10T06:00:00",
-      end_time: "2024-07-10T14:00:00",
-      position_name: "Security",
-      required_qualifications: "Security",
-      qualification_match: { has: 1, required: 1, fully_qualified: true },
-      has_conflicts: false,
-      can_apply: true
-    },
-    {
-      id: 5,
-      shift_name: "Nachtdienst Bar",
-      event_name: "Club Night",
-      location: "Downtown Club",
-      start_time: "2024-07-15T22:00:00",
-      end_time: "2024-07-16T06:00:00",
-      position_name: "Bar",
-      required_qualifications: "Barkeeper, Kassierer",
-      qualification_match: { has: 2, required: 2, fully_qualified: true },
-      has_conflicts: false,
-      can_apply: true
-    },
-    {
-      id: 6,
-      shift_name: "VIP Service",
-      event_name: "Gala Dinner",
-      location: "Hotel Bayerischer Hof",
-      start_time: "2024-07-20T18:00:00",
-      end_time: "2024-07-21T02:00:00",
-      position_name: "Service",
-      required_qualifications: "Service, Barkeeper",
-      qualification_match: { has: 1, required: 2, fully_qualified: false },
-      has_conflicts: false,
-      can_apply: true
-    }
-  ]);
-
-  const [activeTab, setActiveTab] = useState('my-shifts');
-  const [filter, setFilter] = useState('all');
+const MyShifts = () => {
+  const [shifts, setShifts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('assigned'); // assigned, applications
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedShift, setSelectedShift] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [confirmingShift, setConfirmingShift] = useState(null);
   const [stats, setStats] = useState({
-    total: 3,
-    preliminary: 1,
-    final: 1,
-    confirmed: 1
+    total: 0,
+    preliminary: 0,
+    final: 0,
+    confirmed: 0
   });
+  const [applications, setApplications] = useState([]);
+
+  useEffect(() => {
+    if (activeTab === 'assigned') {
+      loadMyShifts();
+    } else {
+      loadMyApplications();
+    }
+  }, [activeTab, statusFilter]);
+
+  const loadMyShifts = async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+      
+      const response = await api.get('/staff/shifts/my', { params });
+      setShifts(response.data.shifts);
+      setStats(response.data.stats);
+    } catch (error) {
+      console.error('Fehler beim Laden der Schichten:', error);
+      toast.error('Fehler beim Laden der Schichten');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMyApplications = async () => {
+    try {
+      setLoading(true);
+      // Lade Bewerbungen über available shifts endpoint mit filter
+      const response = await api.get('/staff/shifts/available?showAll=true');
+      const myApplications = response.data.shifts.filter(s => s.my_status === 'applied');
+      setApplications(myApplications);
+    } catch (error) {
+      console.error('Fehler beim Laden der Bewerbungen:', error);
+      toast.error('Fehler beim Laden der Bewerbungen');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmShift = async (shiftId) => {
+    if (confirmingShift) return;
+    
+    setConfirmingShift(shiftId);
+    try {
+      await api.post(`/staff/shifts/${shiftId}/confirm`);
+      toast.success('Schicht erfolgreich bestätigt');
+      await loadMyShifts();
+    } catch (error) {
+      console.error('Fehler beim Bestätigen:', error);
+      toast.error('Fehler beim Bestätigen der Schicht');
+    } finally {
+      setConfirmingShift(null);
+    }
+  };
+
+  const withdrawApplication = async (shiftId) => {
+    if (!window.confirm('Möchtest du deine Bewerbung wirklich zurückziehen?')) return;
+    
+    try {
+      await api.delete(`/staff/shifts/${shiftId}/apply`);
+      toast.success('Bewerbung erfolgreich zurückgezogen');
+      await loadMyApplications();
+    } catch (error) {
+      console.error('Fehler beim Zurückziehen:', error);
+      toast.error('Fehler beim Zurückziehen der Bewerbung');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const formatDateTime = (dateString) => {
+    return `${formatDate(dateString)} ${formatTime(dateString)}`;
+  };
+
+  const getWeekday = (dateString) => {
+    const date = new Date(dateString);
+    const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    return weekdays[date.getDay()];
+  };
+
+  const isPastShift = (endTime) => {
+    return new Date(endTime) < new Date();
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
       preliminary: {
         text: 'Vorläufig',
         className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        icon: ShieldExclamationIcon
+        icon: ExclamationTriangleIcon
       },
       final: {
         text: 'Endgültig',
@@ -153,60 +167,229 @@ const MyShiftsEnhanced = () => {
     );
   };
 
-  const getQualificationBadge = (match) => {
-    if (!match) return null;
-    
-    const color = match.fully_qualified 
-      ? 'bg-green-100 text-green-800 border-green-200'
-      : 'bg-orange-100 text-orange-800 border-orange-200';
+  const ShiftCard = ({ shift, showActions = true }) => {
+    const isPast = isPastShift(shift.end_time);
+    const needsConfirmation = shift.status === 'final' && !shift.confirmed_at;
     
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${color}`}>
-        <AcademicCapIcon className="h-3 w-3" />
-        {match.has}/{match.required} Qualifikationen
-      </span>
+      <div className={`ios-card p-4 ${isPast ? 'opacity-75' : ''}`}>
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex-1">
+            <h3 className="font-semibold text-ios-gray-900">{shift.event_name}</h3>
+            <p className="text-sm text-ios-gray-600">{shift.shift_name}</p>
+            {shift.position_name && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-ios-purple/10 text-ios-purple mt-1">
+                {shift.position_name}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            {getStatusBadge(shift.status)}
+            {isPast && (
+              <span className="text-xs text-ios-gray-500">Beendet</span>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <CalendarIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span>{getWeekday(shift.start_time)}, {formatDate(shift.start_time)}</span>
+          </div>
+          
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <ClockIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span>{shift.start_time_only || formatTime(shift.start_time)} - {shift.end_time_only || formatTime(shift.end_time)} Uhr</span>
+          </div>
+          
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <MapPinIcon className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="truncate">{shift.location}</span>
+          </div>
+        </div>
+
+        {showActions && (
+          <div className="flex items-center justify-between pt-3 border-t border-ios-gray-200">
+            <button
+              onClick={() => {
+                setSelectedShift(shift);
+                setShowDetailsModal(true);
+              }}
+              className="text-sm text-ios-blue hover:text-blue-600 font-medium flex items-center"
+            >
+              Details anzeigen
+              <ChevronRightIcon className="h-4 w-4 ml-1" />
+            </button>
+            
+            {needsConfirmation && !isPast && (
+              <button
+                onClick={() => confirmShift(shift.shift_id)}
+                disabled={confirmingShift === shift.shift_id}
+                className="ios-button-primary text-sm px-4 py-2 disabled:opacity-50"
+              >
+                {confirmingShift === shift.shift_id ? 'Wird bestätigt...' : 'Bestätigen'}
+              </button>
+            )}
+            
+            {shift.confirmed_at && (
+              <span className="text-xs text-green-600 flex items-center">
+                <CheckCircleIcon className="h-4 w-4 mr-1" />
+                Bestätigt am {formatDate(shift.confirmed_at)}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     );
   };
 
-  const confirmShift = (shiftId) => {
-    const shift = shifts.find(s => s.id === shiftId);
-    if (shift && shift.status === 'final') {
-      setShifts(shifts.map(s => 
-        s.id === shiftId 
-          ? { ...s, status: 'confirmed', confirmed_at: new Date().toISOString() }
-          : s
-      ));
-      setStats(prev => ({
-        ...prev,
-        final: prev.final - 1,
-        confirmed: prev.confirmed + 1
-      }));
-    }
+  const ApplicationCard = ({ shift }) => {
+    return (
+      <div className="ios-card p-4">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex-1">
+            <h3 className="font-semibold text-ios-gray-900">{shift.event_name}</h3>
+            <p className="text-sm text-ios-gray-600">{shift.name}</p>
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-ios-purple/10 text-ios-purple border border-ios-purple/20">
+            <ClockIcon className="h-3.5 w-3.5 mr-1" />
+            Beworben
+          </span>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            <span>{formatDate(shift.start_time)}</span>
+          </div>
+          
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <ClockIcon className="h-4 w-4 mr-2" />
+            <span>{shift.start_time_only} - {shift.end_time_only} Uhr</span>
+          </div>
+          
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <MapPinIcon className="h-4 w-4 mr-2" />
+            <span>{shift.location}</span>
+          </div>
+          
+          <div className="flex items-center text-sm text-ios-gray-600">
+            <UserGroupIcon className="h-4 w-4 mr-2" />
+            <span>{shift.current_staff}/{shift.required_staff} Plätze besetzt</span>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center pt-3 border-t border-ios-gray-200">
+          <button
+            onClick={() => withdrawApplication(shift.id)}
+            className="text-sm text-ios-red hover:text-red-600 font-medium"
+          >
+            Bewerbung zurückziehen
+          </button>
+          
+          <span className="text-xs text-ios-gray-500">
+            Beworben am {formatDate(new Date())}
+          </span>
+        </div>
+      </div>
+    );
   };
 
-  const MyShiftsTab = () => {
-    const filteredShifts = shifts.filter(shift => {
-      if (statusFilter !== 'all' && shift.status !== statusFilter) return false;
-      return true;
-    });
-
+  if (loading) {
     return (
-      <div className="space-y-4">
-        {/* Filter */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-ios-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="grid gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-6 h-48"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-ios-gray-900">Meine Schichten</h1>
+          <p className="text-ios-gray-600">Verwalte deine Schichteinteilungen</p>
+        </div>
+        
+        <button
+          onClick={() => activeTab === 'assigned' ? loadMyShifts() : loadMyApplications()}
+          className="p-2 ios-card hover:bg-ios-gray-100"
+          title="Aktualisieren"
+        >
+          <ArrowPathIcon className="h-5 w-5 text-ios-gray-600" />
+        </button>
+      </div>
+
+      {/* Stats (nur bei assigned) */}
+      {activeTab === 'assigned' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="ios-card p-4 text-center">
+            <p className="text-2xl font-bold text-ios-gray-900">{stats.total}</p>
+            <p className="text-sm text-ios-gray-600">Gesamt</p>
+          </div>
+          <div className="ios-card p-4 text-center border-l-4 border-yellow-400">
+            <p className="text-2xl font-bold text-yellow-600">{stats.preliminary}</p>
+            <p className="text-sm text-ios-gray-600">Vorläufig</p>
+          </div>
+          <div className="ios-card p-4 text-center border-l-4 border-blue-400">
+            <p className="text-2xl font-bold text-blue-600">{stats.final}</p>
+            <p className="text-sm text-ios-gray-600">Endgültig</p>
+          </div>
+          <div className="ios-card p-4 text-center border-l-4 border-green-400">
+            <p className="text-2xl font-bold text-green-600">{stats.confirmed}</p>
+            <p className="text-sm text-ios-gray-600">Bestätigt</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-ios-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('assigned')}
+          className={`flex-1 py-2 px-4 rounded transition-colors ${
+            activeTab === 'assigned' 
+              ? 'bg-white shadow-sm text-ios-gray-900 font-medium' 
+              : 'text-ios-gray-600'
+          }`}
+        >
+          Zugewiesene Schichten
+        </button>
+        <button
+          onClick={() => setActiveTab('applications')}
+          className={`flex-1 py-2 px-4 rounded transition-colors ${
+            activeTab === 'applications' 
+              ? 'bg-white shadow-sm text-ios-gray-900 font-medium' 
+              : 'text-ios-gray-600'
+          }`}
+        >
+          Meine Bewerbungen
+        </button>
+      </div>
+
+      {/* Filter (nur bei assigned) */}
+      {activeTab === 'assigned' && (
+        <div className="ios-card p-4">
           <div className="flex items-center space-x-2 mb-3">
-            <FunnelIcon className="h-5 w-5 text-gray-600" />
-            <span className="font-medium">Filter</span>
+            <FunnelIcon className="h-5 w-5 text-ios-gray-600" />
+            <span className="font-medium">Filter nach Status</span>
           </div>
           <div className="flex gap-2">
             {['all', 'preliminary', 'final', 'confirmed'].map(status => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1 rounded text-sm ${
+                className={`px-3 py-1 rounded text-sm transition-colors ${
                   statusFilter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-ios-blue text-white'
+                    : 'bg-ios-gray-100 text-ios-gray-700 hover:bg-ios-gray-200'
                 }`}
               >
                 {status === 'all' ? 'Alle' : 
@@ -216,270 +399,157 @@ const MyShiftsEnhanced = () => {
             ))}
           </div>
         </div>
-
-        {/* Shifts List */}
-        {filteredShifts.map(shift => {
-          const needsConfirmation = shift.status === 'final';
-
-          return (
-            <div key={shift.id} className="bg-white p-4 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{shift.event_name}</h3>
-                  <p className="text-sm text-gray-600">{shift.shift_name}</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {getStatusBadge(shift.status)}
-                  {getQualificationBadge(shift.qualification_match)}
-                </div>
-              </div>
-
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  <span>20.06.2024</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <ClockIcon className="h-4 w-4 mr-2" />
-                  <span>08:00 - 16:00 Uhr</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPinIcon className="h-4 w-4 mr-2" />
-                  <span>{shift.location}</span>
-                </div>
-                {shift.position_name && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <span className="font-medium mr-2">Position:</span>
-                    <span>{shift.position_name}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-3 border-t">
-                {needsConfirmation ? (
-                  <button
-                    onClick={() => confirmShift(shift.id)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700"
-                  >
-                    Schicht bestätigen
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setSelectedShift(shift);
-                      setShowDetailsModal(true);
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
-                  >
-                    Details anzeigen
-                    <ChevronRightIcon className="h-4 w-4 ml-1" />
-                  </button>
-                )}
-
-                {shift.confirmed_at && (
-                  <span className="text-xs text-green-600 flex items-center">
-                    <CheckCircleIcon className="h-4 w-4 mr-1" />
-                    Bestätigt am 15.06.24
-                  </span>
-                )}
-              </div>
-
-              {/* Warning if not fully qualified */}
-              {!shift.qualification_match.fully_qualified && (
-                <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
-                  <p className="text-xs text-orange-800 flex items-center">
-                    <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
-                    Du erfüllst nicht alle Qualifikationsanforderungen für diese Schicht
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const AvailableShiftsTab = () => (
-    <div className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <InformationCircleIcon className="inline h-4 w-4 mr-1" />
-          Hier siehst du alle Schichten, für die du dich bewerben kannst. Schichten mit fehlenden Qualifikationen werden trotzdem angezeigt.
-        </p>
-      </div>
-
-      {availableShifts.map(shift => (
-        <div key={shift.id} className="bg-white p-4 rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-900">{shift.event_name}</h3>
-              <p className="text-sm text-gray-600">{shift.shift_name}</p>
-            </div>
-            {getQualificationBadge(shift.qualification_match)}
-          </div>
-
-          <div className="space-y-2 mb-4">
-            <div className="flex items-center text-sm text-gray-600">
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              <span>10.07.2024</span>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <ClockIcon className="h-4 w-4 mr-2" />
-              <span>06:00 - 14:00 Uhr</span>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <MapPinIcon className="h-4 w-4 mr-2" />
-              <span>{shift.location}</span>
-            </div>
-            {shift.required_qualifications && (
-              <div className="flex items-center text-sm text-gray-600">
-                <AcademicCapIcon className="h-4 w-4 mr-2" />
-                <span>Benötigt: {shift.required_qualifications}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-between items-center">
-            <button
-              disabled={shift.has_conflicts || !shift.can_apply}
-              className={`px-4 py-2 rounded text-sm font-medium ${
-                shift.has_conflicts || !shift.can_apply
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : shift.qualification_match.fully_qualified
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-orange-600 text-white hover:bg-orange-700'
-              }`}
-            >
-              {shift.has_conflicts ? 'Zeitkonflikt' : 
-               !shift.can_apply ? 'Nicht verfügbar' :
-               'Bewerben'}
-            </button>
-
-            {!shift.qualification_match.fully_qualified && shift.can_apply && (
-              <span className="text-xs text-orange-600">
-                Teilweise qualifiziert
-              </span>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Meine Schichten</h1>
-          <p className="text-gray-600">Verwalte deine Schichteinteilungen und Bewerbungen</p>
-        </div>
-        <button className="p-2 bg-white rounded-lg shadow-sm border hover:bg-gray-50">
-          <ArrowPathIcon className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center">
-          <p className="text-2xl font-bold">{stats.total}</p>
-          <p className="text-sm text-gray-600">Gesamt</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center border-l-4 border-yellow-400">
-          <p className="text-2xl font-bold text-yellow-600">{stats.preliminary}</p>
-          <p className="text-sm text-gray-600">Vorläufig</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center border-l-4 border-blue-400">
-          <p className="text-2xl font-bold text-blue-600">{stats.final}</p>
-          <p className="text-sm text-gray-600">Endgültig</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border text-center border-l-4 border-green-400">
-          <p className="text-2xl font-bold text-green-600">{stats.confirmed}</p>
-          <p className="text-sm text-gray-600">Bestätigt</p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('my-shifts')}
-          className={`flex-1 py-2 px-4 rounded ${
-            activeTab === 'my-shifts' ? 'bg-white shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          Meine Schichten ({shifts.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('available')}
-          className={`flex-1 py-2 px-4 rounded ${
-            activeTab === 'available' ? 'bg-white shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          Verfügbare Schichten ({availableShifts.length})
-        </button>
-      </div>
+      )}
 
       {/* Content */}
-      {activeTab === 'my-shifts' ? <MyShiftsTab /> : <AvailableShiftsTab />}
+      {activeTab === 'assigned' ? (
+        // Zugewiesene Schichten
+        shifts.length > 0 ? (
+          <div className="grid gap-4">
+            {shifts
+              .filter(shift => statusFilter === 'all' || shift.status === statusFilter)
+              .map(shift => (
+                <ShiftCard key={shift.id} shift={shift} />
+              ))}
+          </div>
+        ) : (
+          <div className="ios-card p-12 text-center">
+            <CalendarDaysIcon className="h-12 w-12 text-ios-gray-300 mx-auto mb-4" />
+            <p className="text-ios-gray-500">Keine Schichten gefunden</p>
+            <p className="text-sm text-ios-gray-400 mt-2">
+              Du hast momentan keine zugewiesenen Schichten
+            </p>
+          </div>
+        )
+      ) : (
+        // Bewerbungen
+        applications.length > 0 ? (
+          <div className="grid gap-4">
+            {applications.map(app => (
+              <ApplicationCard key={app.id} shift={app} />
+            ))}
+          </div>
+        ) : (
+          <div className="ios-card p-12 text-center">
+            <DocumentTextIcon className="h-12 w-12 text-ios-gray-300 mx-auto mb-4" />
+            <p className="text-ios-gray-500">Keine offenen Bewerbungen</p>
+            <p className="text-sm text-ios-gray-400 mt-2">
+              Du hast dich noch für keine Schichten beworben
+            </p>
+          </div>
+        )
+      )}
+
+      {/* Info Box bei endgültigen Schichten */}
+      {activeTab === 'assigned' && stats.final > 0 && (
+        <div className="ios-card p-4 bg-ios-blue/5 border border-ios-blue/20">
+          <div className="flex items-start space-x-3">
+            <InformationCircleIcon className="h-5 w-5 text-ios-blue flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-ios-gray-900">
+                Du hast {stats.final} endgültige Schichteinteilung{stats.final > 1 ? 'en' : ''}
+              </p>
+              <p className="text-ios-gray-600 mt-1">
+                Bitte bestätige diese Schichten, um dem Admin mitzuteilen, dass du die Einteilung gesehen hast.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Details Modal */}
       {showDetailsModal && selectedShift && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="ios-modal-backdrop" onClick={() => setShowDetailsModal(false)} />
           <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-40" onClick={() => setShowDetailsModal(false)} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Schichtdetails</h3>
+            <div className="relative bg-white rounded-2xl shadow-ios-xl max-w-md w-full p-6 z-10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-ios-gray-900">Schichtdetails</h3>
                 <button
                   onClick={() => setShowDetailsModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded"
+                  className="p-2 rounded-lg hover:bg-ios-gray-100"
                 >
-                  <XMarkIcon className="h-5 w-5" />
+                  <XMarkIcon className="h-5 w-5 text-ios-gray-600" />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-600">Veranstaltung</p>
-                  <p className="font-medium">{selectedShift.event_name}</p>
+                  <p className="text-sm text-ios-gray-600">Veranstaltung</p>
+                  <p className="font-medium text-ios-gray-900">{selectedShift.event_name}</p>
+                  {selectedShift.event_description && (
+                    <p className="text-sm text-ios-gray-600 mt-1">{selectedShift.event_description}</p>
+                  )}
                 </div>
+                
                 <div>
-                  <p className="text-sm text-gray-600">Schicht</p>
-                  <p className="font-medium">{selectedShift.shift_name}</p>
+                  <p className="text-sm text-ios-gray-600">Schicht</p>
+                  <p className="font-medium text-ios-gray-900">{selectedShift.shift_name}</p>
+                  {selectedShift.shift_description && (
+                    <p className="text-sm text-ios-gray-600 mt-1">{selectedShift.shift_description}</p>
+                  )}
                 </div>
+                
                 <div>
-                  <p className="text-sm text-gray-600">Zeit</p>
-                  <p className="font-medium">20.06.2024 08:00 - 16:00 Uhr</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Ort</p>
-                  <p className="font-medium">{selectedShift.location}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Position</p>
-                  <p className="font-medium">{selectedShift.position_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Status</p>
-                  <div className="mt-1">{getStatusBadge(selectedShift.status)}</div>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Qualifikationen</p>
-                  <div className="mt-1">{getQualificationBadge(selectedShift.qualification_match)}</div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Benötigt: {selectedShift.required_qualifications}
+                  <p className="text-sm text-ios-gray-600">Zeit</p>
+                  <p className="font-medium text-ios-gray-900">
+                    {getWeekday(selectedShift.start_time)}, {formatDate(selectedShift.start_time)}
+                  </p>
+                  <p className="text-sm text-ios-gray-700">
+                    {selectedShift.start_time_only || formatTime(selectedShift.start_time)} - {selectedShift.end_time_only || formatTime(selectedShift.end_time)} Uhr
                   </p>
                 </div>
+                
+                <div>
+                  <p className="text-sm text-ios-gray-600">Ort</p>
+                  <p className="font-medium text-ios-gray-900">{selectedShift.location}</p>
+                </div>
+                
+                {selectedShift.position_name && (
+                  <div>
+                    <p className="text-sm text-ios-gray-600">Position</p>
+                    <p className="font-medium text-ios-gray-900">{selectedShift.position_name}</p>
+                  </div>
+                )}
+                
+                <div>
+                  <p className="text-sm text-ios-gray-600">Status</p>
+                  <div className="mt-1">{getStatusBadge(selectedShift.status)}</div>
+                  {selectedShift.confirmed_at && (
+                    <p className="text-xs text-ios-gray-500 mt-1">
+                      Bestätigt am {formatDateTime(selectedShift.confirmed_at)}
+                    </p>
+                  )}
+                </div>
+                
+                {selectedShift.notes && (
+                  <div>
+                    <p className="text-sm text-ios-gray-600">Notizen</p>
+                    <p className="text-sm text-ios-gray-700">{selectedShift.notes}</p>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-end space-x-3">
                 <button
                   onClick={() => setShowDetailsModal(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                  className="ios-button-secondary"
                 >
                   Schließen
                 </button>
+                
+                {selectedShift.status === 'final' && !selectedShift.confirmed_at && (
+                  <button
+                    onClick={() => {
+                      confirmShift(selectedShift.shift_id);
+                      setShowDetailsModal(false);
+                    }}
+                    disabled={confirmingShift === selectedShift.shift_id}
+                    className="ios-button-primary disabled:opacity-50"
+                  >
+                    {confirmingShift === selectedShift.shift_id ? 'Wird bestätigt...' : 'Bestätigen'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -489,6 +559,4 @@ const MyShiftsEnhanced = () => {
   );
 };
 
-export default MyShiftsEnhanced;
-
-
+export default MyShifts;
