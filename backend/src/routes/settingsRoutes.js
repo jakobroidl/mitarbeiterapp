@@ -10,128 +10,105 @@ const { testEmailConfiguration, updateEmailTemplate, getEmailTemplates } = requi
 // Alle Settings Routes benötigen Admin-Rechte
 router.use(authenticateToken, requireAdmin);
 
-// Allgemeine Einstellungen abrufen
-router.get('/', async (req, res) => {
+// Allgemeine Einstellungen abrufen - KORRIGIERT
+router.get('/general', async (req, res) => {
   try {
     const [settings] = await db.execute(
-      'SELECT setting_key, setting_value, setting_type, description FROM settings'
+      `SELECT setting_key, setting_value, setting_type 
+       FROM settings 
+       WHERE setting_key IN ('company_name', 'admin_email', 'default_shift_duration', 
+                            'break_threshold', 'break_duration')`
     );
     
-    // Konvertiere zu Object für einfachere Verwendung
-    const settingsObject = {};
+    // Konvertiere zu flachem Object für Frontend
+    const settingsObject = {
+      company_name: '',
+      admin_email: '',
+      default_shift_duration: 8,
+      break_threshold: 6,
+      break_duration: 30
+    };
+    
     settings.forEach(setting => {
       let value = setting.setting_value;
       
       // Type conversion
-      switch (setting.setting_type) {
-        case 'number':
-          value = parseInt(value);
-          break;
-        case 'boolean':
-          value = value === '1' || value === 'true';
-          break;
-        case 'json':
-          try {
-            value = JSON.parse(value);
-          } catch {
-            value = null;
-          }
-          break;
+      if (setting.setting_type === 'number') {
+        value = parseInt(value);
+      } else if (setting.setting_type === 'boolean') {
+        value = value === '1' || value === 'true';
       }
       
-      settingsObject[setting.setting_key] = {
-        value,
-        type: setting.setting_type,
-        description: setting.description
-      };
+      settingsObject[setting.setting_key] = value;
     });
     
     res.json(settingsObject);
     
   } catch (error) {
-    console.error('Fehler beim Abrufen der Einstellungen:', error);
+    console.error('Fehler beim Abrufen der allgemeinen Einstellungen:', error);
     res.status(500).json({ 
       message: 'Fehler beim Abrufen der Einstellungen' 
     });
   }
 });
 
-// Einstellung aktualisieren
-router.put('/:key',
-  [
-    param('key')
-      .trim()
-      .notEmpty().withMessage('Setting Key ist erforderlich'),
-    body('value')
-      .notEmpty().withMessage('Wert ist erforderlich')
-  ],
-  handleValidationErrors,
-  async (req, res) => {
-    const connection = await db.getConnection();
+// Allgemeine Einstellungen aktualisieren - NEU
+router.put('/general', async (req, res) => {
+  const connection = await db.getConnection();
+  
+  try {
+    await connection.beginTransaction();
     
-    try {
-      await connection.beginTransaction();
-      
-      const { key } = req.params;
-      const { value } = req.body;
-      
+    const settings = req.body;
+    
+    for (const [key, value] of Object.entries(settings)) {
       // Prüfe ob Einstellung existiert
       const [existing] = await connection.execute(
-        'SELECT setting_type FROM settings WHERE setting_key = ?',
+        'SELECT id FROM settings WHERE setting_key = ?',
         [key]
       );
       
-      if (existing.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ 
-          message: 'Einstellung nicht gefunden' 
-        });
-      }
+      let settingValue = String(value);
       
-      // Konvertiere Wert basierend auf Typ
-      let settingValue = value;
-      if (typeof value === 'object') {
-        settingValue = JSON.stringify(value);
-      } else if (typeof value === 'boolean') {
-        settingValue = value ? '1' : '0';
+      if (existing.length > 0) {
+        // Update
+        await connection.execute(
+          'UPDATE settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?',
+          [settingValue, key]
+        );
       } else {
-        settingValue = String(value);
+        // Insert
+        const settingType = typeof value === 'number' ? 'number' : 'string';
+        await connection.execute(
+          'INSERT INTO settings (setting_key, setting_value, setting_type) VALUES (?, ?, ?)',
+          [key, settingValue, settingType]
+        );
       }
-      
-      // Update
-      await connection.execute(
-        'UPDATE settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?',
-        [settingValue, key]
-      );
-      
-      // Aktivitätslog
-      await connection.execute(
-        `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, details)
-         VALUES (?, 'setting_updated', 'settings', ?, ?)`,
-        [
-          req.user.id,
-          0,
-          JSON.stringify({ key, oldValue: existing[0].setting_value, newValue: settingValue })
-        ]
-      );
-      
-      await connection.commit();
-      
-      res.json({ 
-        message: 'Einstellung erfolgreich aktualisiert' 
-      });
-      
-    } catch (error) {
-      await connection.rollback();
-      console.error('Fehler beim Aktualisieren der Einstellung:', error);
-      res.status(500).json({ 
-        message: 'Fehler beim Aktualisieren der Einstellung' 
-      });
-    } finally {
-      connection.release();
     }
+    
+    // Aktivitätslog
+    await connection.execute(
+      `INSERT INTO activity_logs (user_id, action, entity_type, details)
+       VALUES (?, 'settings_updated', 'settings', ?)`,
+      [req.user.id, JSON.stringify({ updated: Object.keys(settings) })]
+    );
+    
+    await connection.commit();
+    
+    res.json({ 
+      message: 'Einstellungen erfolgreich aktualisiert' 
+    });
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Fehler beim Aktualisieren der Einstellungen:', error);
+    res.status(500).json({ 
+      message: 'Fehler beim Aktualisieren der Einstellungen' 
+    });
+  } finally {
+    connection.release();
   }
-);
+});
 
 // Qualifikationen verwalten
 router.get('/qualifications', async (req, res) => {
@@ -205,6 +182,9 @@ router.put('/qualifications/:id',
       .trim()
       .notEmpty().withMessage('Name darf nicht leer sein')
       .isLength({ max: 100 }).withMessage('Name darf maximal 100 Zeichen lang sein'),
+    body('color')
+      .optional()
+      .matches(/^#[0-9A-F]{6}$/i).withMessage('Ungültiger Hex-Farbcode'),
     body('is_active')
       .optional()
       .isBoolean().withMessage('is_active muss ein Boolean sein')
@@ -267,6 +247,63 @@ router.put('/qualifications/:id',
   }
 );
 
+// DELETE Route für Qualifikationen - NEU
+router.delete('/qualifications/:id',
+  [
+    param('id').isInt().withMessage('Ungültige Qualifikations ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const connection = await db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      const { id } = req.params;
+      
+      // Prüfe ob Qualifikation verwendet wird
+      const [usage] = await connection.execute(
+        'SELECT COUNT(*) as count FROM staff_qualifications WHERE qualification_id = ?',
+        [id]
+      );
+      
+      if (usage[0].count > 0) {
+        await connection.rollback();
+        return res.status(400).json({ 
+          message: 'Qualifikation kann nicht gelöscht werden, da sie noch verwendet wird' 
+        });
+      }
+      
+      const [result] = await connection.execute(
+        'DELETE FROM qualifications WHERE id = ?',
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(404).json({ 
+          message: 'Qualifikation nicht gefunden' 
+        });
+      }
+      
+      await connection.commit();
+      
+      res.json({ 
+        message: 'Qualifikation erfolgreich gelöscht' 
+      });
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error('Fehler beim Löschen der Qualifikation:', error);
+      res.status(500).json({ 
+        message: 'Fehler beim Löschen der Qualifikation' 
+      });
+    } finally {
+      connection.release();
+    }
+  }
+);
+
 // Positionen verwalten
 router.get('/positions', async (req, res) => {
   try {
@@ -323,6 +360,141 @@ router.post('/positions',
       res.status(500).json({ 
         message: 'Fehler beim Erstellen der Position' 
       });
+    }
+  }
+);
+
+// PUT Route für Positionen - NEU
+router.put('/positions/:id',
+  [
+    param('id').isInt().withMessage('Ungültige Positions ID'),
+    body('name')
+      .optional()
+      .trim()
+      .notEmpty().withMessage('Name darf nicht leer sein')
+      .isLength({ max: 100 }).withMessage('Name darf maximal 100 Zeichen lang sein'),
+    body('color')
+      .optional()
+      .matches(/^#[0-9A-F]{6}$/i).withMessage('Ungültiger Hex-Farbcode'),
+    body('is_active')
+      .optional()
+      .isBoolean().withMessage('is_active muss ein Boolean sein')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const updateFields = [];
+      const updateParams = [];
+      
+      if (updates.name !== undefined) {
+        updateFields.push('name = ?');
+        updateParams.push(updates.name);
+      }
+      if (updates.description !== undefined) {
+        updateFields.push('description = ?');
+        updateParams.push(updates.description);
+      }
+      if (updates.color !== undefined) {
+        updateFields.push('color = ?');
+        updateParams.push(updates.color);
+      }
+      if (updates.is_active !== undefined) {
+        updateFields.push('is_active = ?');
+        updateParams.push(updates.is_active ? 1 : 0);
+      }
+      
+      if (updateFields.length === 0) {
+        return res.status(400).json({ 
+          message: 'Keine Änderungen angegeben' 
+        });
+      }
+      
+      updateParams.push(id);
+      
+      const [result] = await db.execute(
+        `UPDATE positions SET ${updateFields.join(', ')} WHERE id = ?`,
+        updateParams
+      );
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ 
+          message: 'Position nicht gefunden' 
+        });
+      }
+      
+      res.json({ 
+        message: 'Position erfolgreich aktualisiert' 
+      });
+      
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Position:', error);
+      res.status(500).json({ 
+        message: 'Fehler beim Aktualisieren der Position' 
+      });
+    }
+  }
+);
+
+// DELETE Route für Positionen - NEU
+router.delete('/positions/:id',
+  [
+    param('id').isInt().withMessage('Ungültige Positions ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    const connection = await db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      const { id } = req.params;
+      
+      // Prüfe ob Position verwendet wird
+      const [usage] = await connection.execute(
+        `SELECT COUNT(*) as count FROM timeclock_entries WHERE position_id = ?
+         UNION ALL
+         SELECT COUNT(*) as count FROM shifts WHERE position_id = ?`,
+        [id, id]
+      );
+      
+      const totalUsage = usage.reduce((sum, row) => sum + row.count, 0);
+      
+      if (totalUsage > 0) {
+        await connection.rollback();
+        return res.status(400).json({ 
+          message: 'Position kann nicht gelöscht werden, da sie noch verwendet wird' 
+        });
+      }
+      
+      const [result] = await connection.execute(
+        'DELETE FROM positions WHERE id = ?',
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return res.status(404).json({ 
+          message: 'Position nicht gefunden' 
+        });
+      }
+      
+      await connection.commit();
+      
+      res.json({ 
+        message: 'Position erfolgreich gelöscht' 
+      });
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error('Fehler beim Löschen der Position:', error);
+      res.status(500).json({ 
+        message: 'Fehler beim Löschen der Position' 
+      });
+    } finally {
+      connection.release();
     }
   }
 );
@@ -404,3 +576,5 @@ router.post('/test-email', async (req, res) => {
 });
 
 module.exports = router;
+
+
