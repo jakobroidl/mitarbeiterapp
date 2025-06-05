@@ -1,4 +1,4 @@
-// frontend/src/pages/admin/EventCreate.js
+// frontend/src/pages/admin/EventCreate.js - ERWEITERTE VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -16,13 +16,17 @@ import {
   ExclamationCircleIcon,
   CheckCircleIcon,
   DocumentTextIcon,
-  SparklesIcon
+  SparklesIcon,
+  AcademicCapIcon,
+  HashtagIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 
 const EventCreate = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [positions, setPositions] = useState([]);
+  const [qualifications, setQualifications] = useState([]);
   const [showShifts, setShowShifts] = useState(false);
   
   const {
@@ -56,6 +60,7 @@ const EventCreate = () => {
 
   useEffect(() => {
     loadPositions();
+    loadQualifications();
   }, []);
 
   // Auto-fill end date when start date changes
@@ -74,6 +79,15 @@ const EventCreate = () => {
     }
   };
 
+  const loadQualifications = async () => {
+    try {
+      const response = await api.get('/settings/qualifications');
+      setQualifications(response.data.qualifications.filter(q => q.is_active));
+    } catch (error) {
+      console.error('Fehler beim Laden der Qualifikationen:', error);
+    }
+  };
+
   const addShift = () => {
     const lastShift = fields[fields.length - 1];
     const newStartTime = lastShift 
@@ -86,9 +100,42 @@ const EventCreate = () => {
       start_time: newStartTime,
       end_time: newEndTime,
       required_staff: 1,
+      min_staff: 0,
+      max_staff: 0,
       position_id: '',
+      qualification_ids: [],
       description: ''
     });
+  };
+
+  const generateStandardShifts = () => {
+    const standardShifts = [
+      { name: 'Frühdienst', start: '06:00', end: '14:00', required: 3, min: 2, max: 5 },
+      { name: 'Spätdienst', start: '14:00', end: '22:00', required: 4, min: 3, max: 6 },
+      { name: 'Nachtdienst', start: '22:00', end: '06:00', required: 2, min: 1, max: 3 }
+    ];
+
+    // Clear existing shifts
+    while (fields.length > 0) {
+      remove(0);
+    }
+
+    // Add standard shifts
+    standardShifts.forEach(shift => {
+      append({
+        name: shift.name,
+        start_time: shift.start,
+        end_time: shift.end,
+        required_staff: shift.required,
+        min_staff: shift.min,
+        max_staff: shift.max,
+        position_id: '',
+        qualification_ids: [],
+        description: ''
+      });
+    });
+
+    toast.success('Standard-Schichten hinzugefügt');
   };
 
   const onSubmit = async (data) => {
@@ -106,7 +153,10 @@ const EventCreate = () => {
         end_time: shift.end_time < shift.start_time 
           ? `${data.end_date}T${shift.end_time}:00`
           : `${data.start_date}T${shift.end_time}:00`,
-        position_id: shift.position_id || null
+        position_id: shift.position_id || null,
+        qualification_ids: shift.qualification_ids || [],
+        min_staff: parseInt(shift.min_staff) || 0,
+        max_staff: parseInt(shift.max_staff) || 0
       }));
 
       const eventData = {
@@ -131,33 +181,6 @@ const EventCreate = () => {
     }
   };
 
-  const generateStandardShifts = () => {
-    const standardShifts = [
-      { name: 'Frühdienst', start: '06:00', end: '14:00' },
-      { name: 'Spätdienst', start: '14:00', end: '22:00' },
-      { name: 'Nachtdienst', start: '22:00', end: '06:00' }
-    ];
-
-    // Clear existing shifts
-    while (fields.length > 0) {
-      remove(0);
-    }
-
-    // Add standard shifts
-    standardShifts.forEach(shift => {
-      append({
-        name: shift.name,
-        start_time: shift.start,
-        end_time: shift.end,
-        required_staff: 2,
-        position_id: '',
-        description: ''
-      });
-    });
-
-    toast.success('Standard-Schichten hinzugefügt');
-  };
-
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -171,7 +194,7 @@ const EventCreate = () => {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-ios-gray-900">Neue Veranstaltung</h1>
-            <p className="text-ios-gray-600">Erstellen Sie eine neue Veranstaltung</p>
+            <p className="text-ios-gray-600">Erstellen Sie eine neue Veranstaltung mit erweiterten Schichtoptionen</p>
           </div>
         </div>
       </div>
@@ -363,7 +386,7 @@ const EventCreate = () => {
           </div>
         </div>
 
-        {/* Shifts */}
+        {/* Enhanced Shifts Section */}
         <div className="ios-card p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ios-gray-900 flex items-center">
@@ -485,19 +508,69 @@ const EventCreate = () => {
                           </div>
                         </div>
 
-                        {/* Required Staff */}
-                        <div>
-                          <label className="block text-xs font-medium text-ios-gray-600 mb-1">
-                            Benötigte Mitarbeiter
-                          </label>
-                          <input
-                            {...register(`shifts.${index}.required_staff`, {
-                              min: { value: 1, message: 'Mindestens 1' }
-                            })}
-                            type="number"
-                            min="1"
-                            className="ios-input py-2 text-sm"
-                          />
+                        {/* Staff Numbers */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-ios-gray-600 mb-1">
+                              <UsersIcon className="inline h-3 w-3 mr-1" />
+                              Soll
+                            </label>
+                            <input
+                              {...register(`shifts.${index}.required_staff`, {
+                                min: { value: 1, message: 'Min. 1' }
+                              })}
+                              type="number"
+                              min="1"
+                              className="ios-input py-2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-ios-gray-600 mb-1">
+                              <HashtagIcon className="inline h-3 w-3 mr-1" />
+                              Min
+                            </label>
+                            <input
+                              {...register(`shifts.${index}.min_staff`)}
+                              type="number"
+                              min="0"
+                              className="ios-input py-2 text-sm"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-ios-gray-600 mb-1">
+                              <HashtagIcon className="inline h-3 w-3 mr-1" />
+                              Max
+                            </label>
+                            <input
+                              {...register(`shifts.${index}.max_staff`)}
+                              type="number"
+                              min="0"
+                              className="ios-input py-2 text-sm"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Required Qualifications */}
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-ios-gray-600 mb-1">
+                          <AcademicCapIcon className="inline h-3 w-3 mr-1" />
+                          Erforderliche Qualifikationen
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {qualifications.map(qual => (
+                            <label key={qual.id} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                value={qual.id}
+                                {...register(`shifts.${index}.qualification_ids`)}
+                                className="rounded text-ios-blue focus:ring-ios-blue mr-1.5"
+                              />
+                              <span className="text-sm text-ios-gray-700">{qual.name}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
 
@@ -588,6 +661,5 @@ const EventCreate = () => {
 };
 
 export default EventCreate;
-
 
 

@@ -18,6 +18,12 @@ import {
 import { format, startOfMonth, endOfMonth, isToday, isTomorrow, parseISO, differenceInHours } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+<Link to="/staff/shifts/available" className="...">
+  <CalendarDaysIcon className="h-5 w-5 mr-2" />
+  Verfügbare Schichten
+</Link>
+
+
 const StaffDashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);

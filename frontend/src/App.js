@@ -156,6 +156,8 @@ function App() {
             <Route path="timeclock" element={<MyTimeclock />} />
             <Route path="messages" element={<MyMessages />} />
             <Route path="profile" element={<MyProfile />} />
+            <Route path="shifts/available" element={<AvailableShifts />} />
+
           </Route>
         </Route>
 
