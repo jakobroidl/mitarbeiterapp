@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
+const emailService = require('../config/emailConfig');
 
 // Alle Dashboard Routes benötigen Authentifizierung
 router.use(authenticateToken);

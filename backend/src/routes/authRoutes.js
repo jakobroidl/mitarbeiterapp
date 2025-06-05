@@ -5,6 +5,7 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Öffentliche Routen
 

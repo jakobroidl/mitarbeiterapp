@@ -6,6 +6,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const db = require('../config/database');
 const { testEmailConfiguration, updateEmailTemplate, getEmailTemplates } = require('../services/emailService');
+const emailService = require('../config/emailConfig');
 
 // Alle Settings Routes benötigen Admin-Rechte
 router.use(authenticateToken, requireAdmin);

@@ -6,6 +6,7 @@ const applicationController = require('../controllers/applicationController');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 const { handleValidationErrors, isValidGermanPhoneNumber, isValidPostalCode, isValidBirthDate } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Öffentliche Route - Bewerbung einreichen
 router.post('/submit',

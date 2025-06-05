@@ -5,6 +5,7 @@ const { body, param } = require('express-validator');
 const eventController = require('../controllers/eventController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { handleValidationErrors, isOptionalInt } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Alle Event Routes benötigen Authentifizierung
 router.use(authenticateToken);

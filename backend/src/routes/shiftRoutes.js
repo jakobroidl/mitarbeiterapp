@@ -5,6 +5,7 @@ const { body, param } = require('express-validator');
 const shiftController = require('../controllers/shiftController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { handleValidationErrors, isOptionalInt } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Alle Shift Routes benötigen Authentifizierung
 router.use(authenticateToken);

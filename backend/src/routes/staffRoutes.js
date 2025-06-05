@@ -6,6 +6,7 @@ const staffController = require('../controllers/staffController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 const { handleValidationErrors, isValidGermanPhoneNumber, isValidPostalCode } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Alle Staff Routes benötigen Authentifizierung
 router.use(authenticateToken);

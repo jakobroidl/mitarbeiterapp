@@ -5,6 +5,7 @@ const { body, param } = require('express-validator');
 const messageController = require('../controllers/messageController');
 const { authenticateToken } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const emailService = require('../config/emailConfig');
 
 // Alle Message Routes benötigen Authentifizierung
 router.use(authenticateToken);

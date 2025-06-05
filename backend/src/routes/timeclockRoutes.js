@@ -6,6 +6,8 @@ const timeclockController = require('../controllers/timeclockController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const db = require('../config/database'); 
+const emailService = require('../config/emailConfig');
+
 // Kiosk Routes (ohne Authentifizierung)
 router.post('/kiosk/clock-in',
   [
