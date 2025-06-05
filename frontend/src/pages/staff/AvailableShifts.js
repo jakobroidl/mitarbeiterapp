@@ -1,4 +1,4 @@
-// frontend/src/pages/staff/AvailableShifts.js - NEU
+// frontend/src/pages/staff/AvailableShifts.js - KORRIGIERT
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -41,7 +41,8 @@ const AvailableShifts = () => {
   const loadAvailableShifts = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/staff/shifts/available?showAll=${showAll}`);
+      // KORRIGIERT: Richtiger API-Pfad ohne /staff
+      const response = await api.get(`/shifts/available?showAll=${showAll}`);
       setShifts(response.data.shifts);
       setStats(response.data.stats);
     } catch (error) {
@@ -55,7 +56,8 @@ const AvailableShifts = () => {
   const applyForShift = async (shiftId) => {
     setApplying(true);
     try {
-      await api.post(`/staff/shifts/${shiftId}/apply`);
+      // KORRIGIERT: Richtiger API-Pfad ohne /staff
+      await api.post(`/shifts/${shiftId}/apply`);
       toast.success('Bewerbung erfolgreich eingereicht');
       loadAvailableShifts();
       setShowDetailsModal(false);
@@ -466,5 +468,3 @@ const AvailableShifts = () => {
 };
 
 export default AvailableShifts;
-
-

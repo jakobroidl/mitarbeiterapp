@@ -602,10 +602,11 @@ const applyForShift = async (req, res) => {
 };
 
 // Verfügbare Schichten für Bewerbung (Staff) - AKTUALISIERT
+// Verfügbare Schichten für Bewerbung (Staff) - AKTUALISIERT
 const getAvailableShifts = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { showAll = 'false' } = req.query; // Option um alle Schichten zu sehen
+    const { showAll = 'false' } = req.query;
     
     // Hole Staff ID
     const [staffResult] = await db.execute(
@@ -621,16 +622,14 @@ const getAvailableShifts = async (req, res) => {
     
     const staffId = staffResult[0].id;
     
-    // Basis-Query für Schichten
-    let query = `
+    // Vereinfachte Query ohne shift_qualifications
+    const query = `
       SELECT 
         s.*,
         e.name as event_name,
         e.location,
         e.start_date as event_date,
         p.name as position_name,
-        GROUP_CONCAT(DISTINCT q.name ORDER BY q.name SEPARATOR ', ') as required_qualifications,
-        GROUP_CONCAT(DISTINCT q.id) as qualification_ids,
         COUNT(DISTINCT sa.staff_id) as current_staff,
         DATE_FORMAT(s.start_time, '%Y-%m-%d') as shift_date,
         DATE_FORMAT(s.start_time, '%H:%i') as start_time_only,
@@ -640,23 +639,13 @@ const getAvailableShifts = async (req, res) => {
           WHEN sass.id IS NOT NULL THEN 'assigned'
           ELSE 'available'
         END as my_status,
-        (
-          SELECT COUNT(DISTINCT sq2.qualification_id)
-          FROM shift_qualifications shq
-          JOIN staff_qualifications sq2 ON shq.qualification_id = sq2.qualification_id
-          WHERE shq.shift_id = s.id AND sq2.staff_id = ?
-        ) as matching_qualifications,
-        (
-          SELECT COUNT(DISTINCT qualification_id)
-          FROM shift_qualifications
-          WHERE shift_id = s.id
-        ) as required_qualification_count
+        '' as required_qualifications,
+        0 as matching_qualifications,
+        0 as required_qualification_count
       FROM shifts s
       JOIN events e ON s.event_id = e.id
       JOIN event_invitations ei ON e.id = ei.event_id
       LEFT JOIN positions p ON s.position_id = p.id
-      LEFT JOIN shift_qualifications shq ON s.id = shq.shift_id
-      LEFT JOIN qualifications q ON shq.qualification_id = q.id
       LEFT JOIN shift_assignments sa ON s.id = sa.shift_id AND sa.status != 'cancelled'
       LEFT JOIN shift_applications sapp ON s.id = sapp.shift_id AND sapp.staff_id = ?
       LEFT JOIN shift_assignments sass ON s.id = sass.shift_id AND sass.staff_id = ?
@@ -664,17 +653,11 @@ const getAvailableShifts = async (req, res) => {
         AND ei.status = 'accepted'
         AND e.status = 'published'
         AND s.start_time > NOW()
+      GROUP BY s.id 
+      ORDER BY s.start_time
     `;
     
-    const params = [staffId, staffId, staffId, staffId];
-    
-    // Wenn nicht alle angezeigt werden sollen, nur qualifizierte Schichten
-    if (showAll !== 'true') {
-      query += ` HAVING (required_qualification_count = 0 OR matching_qualifications > 0)`;
-    }
-    
-    query += ` GROUP BY s.id ORDER BY s.start_time`;
-    
+    const params = [staffId, staffId, staffId];
     const [shifts] = await db.execute(query, params);
     
     // Füge zusätzliche Informationen hinzu
@@ -684,13 +667,11 @@ const getAvailableShifts = async (req, res) => {
       
       return {
         ...shift,
-        fully_qualified: shift.matching_qualifications === shift.required_qualification_count,
-        partially_qualified: shift.matching_qualifications > 0 && shift.matching_qualifications < shift.required_qualification_count,
+        fully_qualified: true, // Temporär immer true
+        partially_qualified: false,
         has_conflicts: conflicts.length > 0,
         conflicts,
-        can_apply: shift.my_status === 'available' && 
-                  conflicts.length === 0 && 
-                  (shift.required_qualification_count === 0 || shift.matching_qualifications > 0)
+        can_apply: shift.my_status === 'available' && conflicts.length === 0
       };
     }));
     
@@ -712,7 +693,7 @@ const getAvailableShifts = async (req, res) => {
         available: shiftsWithDetails.filter(s => s.can_apply).length,
         applied: shiftsWithDetails.filter(s => s.my_status === 'applied').length,
         assigned: shiftsWithDetails.filter(s => s.my_status === 'assigned').length,
-        qualified: shiftsWithDetails.filter(s => s.fully_qualified).length,
+        qualified: shiftsWithDetails.length, // Temporär alle
         with_conflicts: shiftsWithDetails.filter(s => s.has_conflicts).length
       }
     });
@@ -723,7 +704,9 @@ const getAvailableShifts = async (req, res) => {
       message: 'Fehler beim Abrufen der Schichten' 
     });
   }
-};
+}; 
+
+
 
 // Andere bestehende Funktionen bleiben unverändert...
 const bulkAssignStaff = async (req, res) => {
@@ -864,7 +847,7 @@ const bulkAssignStaff = async (req, res) => {
   } finally {
     connection.release();
   }
-};
+}
 
 // Alle anderen bestehenden Funktionen bleiben wie sie sind...
 const removeShiftAssignment = async (req, res) => {

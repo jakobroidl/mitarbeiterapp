@@ -40,7 +40,6 @@ const MainLayout = () => {
     { name: 'Dashboard', href: '/staff/dashboard', icon: HomeIcon },
     { name: 'Mein Kalender', href: '/staff/schedule', icon: CalendarIcon },
     { name: 'Meine Schichten', href: '/staff/shifts', icon: ClockIcon },
-    { name: 'Schichten finden', href: '/staff/shifts/available', icon: MagnifyingGlassIcon },
     { name: 'Einladungen', href: '/staff/invitations', icon: BellIcon },
     { name: 'Stempeluhr', href: '/staff/timeclock', icon: ChartBarIcon },
     { name: 'Nachrichten', href: '/staff/messages', icon: EnvelopeIcon },

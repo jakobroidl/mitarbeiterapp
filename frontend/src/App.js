@@ -42,7 +42,7 @@ import EventInvitations from './pages/staff/EventInvitations';
 import MyTimeclock from './pages/staff/MyTimeclock';
 import MyMessages from './pages/staff/MyMessages';
 import MyProfile from './pages/staff/MyProfile';
-import AvailableShifts from './pages/staff/AvailableShifts';
+
 // Kiosk Mode
 import KioskMode from './pages/kiosk/KioskMode';
 
@@ -156,7 +156,7 @@ function App() {
             <Route path="timeclock" element={<MyTimeclock />} />
             <Route path="messages" element={<MyMessages />} />
             <Route path="profile" element={<MyProfile />} />
-            <Route path="shifts/available" element={<AvailableShifts />} />
+            
 
           </Route>
         </Route>
