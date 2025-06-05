@@ -6,21 +6,22 @@ import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  CheckCircle,
-  AlertTriangle,
-  Info,
-  ShieldAlert,
-  GraduationCap,
-  ChevronRight,
-  Filter,
-  RefreshCw,
-  X,
-  FileText,
-  Eye
-} from 'lucide-react';
+  CalendarIcon,
+  ClockIcon,
+  MapPinIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  ShieldExclamationIcon,
+  AcademicCapIcon,
+  ChevronRightIcon,
+  FunnelIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+  DocumentTextIcon,
+  EyeIcon
+} from '@heroicons/react/24/outline';
+
 
 const MyShiftsEnhanced = () => {
   const [shifts, setShifts] = useState([
@@ -127,17 +128,17 @@ const MyShiftsEnhanced = () => {
       preliminary: {
         text: 'Vorläufig',
         className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        icon: AlertTriangle
+        icon: ShieldExclamationIcon
       },
       final: {
         text: 'Endgültig',
         className: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: Info
+        icon: InformationCircleIcon
       },
       confirmed: {
         text: 'Bestätigt',
         className: 'bg-green-100 text-green-800 border-green-200',
-        icon: CheckCircle
+        icon: CheckCircleIcon
       }
     };
 
@@ -161,7 +162,7 @@ const MyShiftsEnhanced = () => {
     
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${color}`}>
-        <GraduationCap className="h-3 w-3" />
+        <AcademicCapIcon className="h-3 w-3" />
         {match.has}/{match.required} Qualifikationen
       </span>
     );
@@ -194,7 +195,7 @@ const MyShiftsEnhanced = () => {
         {/* Filter */}
         <div className="bg-white p-4 rounded-lg shadow-sm border">
           <div className="flex items-center space-x-2 mb-3">
-            <Filter className="h-5 w-5 text-gray-600" />
+            <FunnelIcon className="h-5 w-5 text-gray-600" />
             <span className="font-medium">Filter</span>
           </div>
           <div className="flex gap-2">
@@ -235,15 +236,15 @@ const MyShiftsEnhanced = () => {
 
               <div className="space-y-2 mb-4">
                 <div className="flex items-center text-sm text-gray-600">
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <CalendarIcon className="h-4 w-4 mr-2" />
                   <span>20.06.2024</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <Clock className="h-4 w-4 mr-2" />
+                  <ClockIcon className="h-4 w-4 mr-2" />
                   <span>08:00 - 16:00 Uhr</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-2" />
+                  <MapPinIcon className="h-4 w-4 mr-2" />
                   <span>{shift.location}</span>
                 </div>
                 {shift.position_name && (
@@ -271,13 +272,13 @@ const MyShiftsEnhanced = () => {
                     className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
                   >
                     Details anzeigen
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <ChevronRightIcon className="h-4 w-4 ml-1" />
                   </button>
                 )}
 
                 {shift.confirmed_at && (
                   <span className="text-xs text-green-600 flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1" />
+                    <CheckCircleIcon className="h-4 w-4 mr-1" />
                     Bestätigt am 15.06.24
                   </span>
                 )}
@@ -287,7 +288,7 @@ const MyShiftsEnhanced = () => {
               {!shift.qualification_match.fully_qualified && (
                 <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
                   <p className="text-xs text-orange-800 flex items-center">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    <ExclamationTriangleIcon className="h-4 w-4 mr-1" />
                     Du erfüllst nicht alle Qualifikationsanforderungen für diese Schicht
                   </p>
                 </div>
@@ -303,7 +304,7 @@ const MyShiftsEnhanced = () => {
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-800">
-          <Info className="inline h-4 w-4 mr-1" />
+          <InformationCircleIcon className="inline h-4 w-4 mr-1" />
           Hier siehst du alle Schichten, für die du dich bewerben kannst. Schichten mit fehlenden Qualifikationen werden trotzdem angezeigt.
         </p>
       </div>
@@ -320,20 +321,20 @@ const MyShiftsEnhanced = () => {
 
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-gray-600">
-              <Calendar className="h-4 w-4 mr-2" />
+              <CalendarIcon className="h-4 w-4 mr-2" />
               <span>10.07.2024</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
-              <Clock className="h-4 w-4 mr-2" />
+              <ClockIcon className="h-4 w-4 mr-2" />
               <span>06:00 - 14:00 Uhr</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
-              <MapPin className="h-4 w-4 mr-2" />
+              <MapPinIcon className="h-4 w-4 mr-2" />
               <span>{shift.location}</span>
             </div>
             {shift.required_qualifications && (
               <div className="flex items-center text-sm text-gray-600">
-                <GraduationCap className="h-4 w-4 mr-2" />
+                <AcademicCapIcon className="h-4 w-4 mr-2" />
                 <span>Benötigt: {shift.required_qualifications}</span>
               </div>
             )}
@@ -375,7 +376,7 @@ const MyShiftsEnhanced = () => {
           <p className="text-gray-600">Verwalte deine Schichteinteilungen und Bewerbungen</p>
         </div>
         <button className="p-2 bg-white rounded-lg shadow-sm border hover:bg-gray-50">
-          <RefreshCw className="h-5 w-5" />
+          <ArrowPathIcon className="h-5 w-5" />
         </button>
       </div>
 
@@ -434,7 +435,7 @@ const MyShiftsEnhanced = () => {
                   onClick={() => setShowDetailsModal(false)}
                   className="p-2 hover:bg-gray-100 rounded"
                 >
-                  <X className="h-5 w-5" />
+                  <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
 

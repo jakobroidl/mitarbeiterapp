@@ -13,7 +13,8 @@ import {
   ArrowRightIcon,
   ExclamationTriangleIcon,
   DocumentTextIcon,
-  MapPinIcon
+  MapPinIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, isToday, isTomorrow, parseISO, differenceInHours } from 'date-fns';
 import { de } from 'date-fns/locale';

@@ -42,7 +42,7 @@ import EventInvitations from './pages/staff/EventInvitations';
 import MyTimeclock from './pages/staff/MyTimeclock';
 import MyMessages from './pages/staff/MyMessages';
 import MyProfile from './pages/staff/MyProfile';
-
+import AvailableShifts from './pages/staff/AvailableShifts';
 // Kiosk Mode
 import KioskMode from './pages/kiosk/KioskMode';
 

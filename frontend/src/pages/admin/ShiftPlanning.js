@@ -989,47 +989,6 @@ const ShiftPlanning = () => {
   );
 };
 
-// Neue Features in der Schichtplanung:
-
-// 1. Qualifikationsanzeige pro Schicht
-{shift.required_qualifications && (
-  <div className="flex items-center mt-2 space-x-2">
-    <AcademicCapIcon className="h-4 w-4 text-ios-gray-500" />
-    <div className="flex flex-wrap gap-1">
-      {shift.required_qualifications.split(', ').map((qual, idx) => (
-        <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getQualificationBadge(qual)}`}>
-          {qual}
-        </span>
-      ))}
-    </div>
-  </div>
-)}
-
-// 2. Erweiterte Filteroptionen
-const [filterFullyQualified, setFilterFullyQualified] = useState(false);
-const [filterNoConflicts, setFilterNoConflicts] = useState(true);
-
-// 3. Bewerberanzeige mit Qualifikationsstatus
-{shift.coverage.applicants > 0 && (
-  <span className="text-ios-purple">
-    <EnvelopeIcon className="inline h-4 w-4 mr-1" />
-    {shift.coverage.applicants} Bewerbungen
-    {shift.coverage.qualified_applicants > 0 && (
-      <span className="text-ios-green ml-1">
-        ({shift.coverage.qualified_applicants} qualifiziert)
-      </span>
-    )}
-  </span>
-)}
-
-// 4. Detaillierte Konfliktanzeige
-{applicant.has_conflicts && (
-  <p className="text-xs text-ios-red mt-1">
-    Konflikt mit: {applicant.conflicts.map(c => c.shift_name).join(', ')}
-  </p>
-)}
-
-
 export default ShiftPlanning;
 
 
