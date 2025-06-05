@@ -11,13 +11,15 @@ try {
   throw new Error('Nodemailer konnte nicht geladen werden');
 }
 
-// E-Mail Transporter erstellen - VEREINFACHTE VERSION
-const createTransport = () => {
+// E-Mail Transporter erstellen - KORRIGIERT
+const createTransporter = () => {
   console.log('[EmailService] Creating email transporter...');
   
-  // Prüfe ob nodemailer vorhanden ist
+  // Prüfe ob nodemailer vorhanden ist - KORRIGIERT
   if (!nodemailer || typeof nodemailer.createTransport !== 'function') {
     console.error('[EmailService] Nodemailer not properly loaded');
+    console.error('[EmailService] nodemailer type:', typeof nodemailer);
+    console.error('[EmailService] nodemailer keys:', nodemailer ? Object.keys(nodemailer) : 'undefined');
     throw new Error('Nodemailer ist nicht korrekt geladen');
   }
   
@@ -28,21 +30,26 @@ const createTransport = () => {
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
+    },
+    // Wichtig für IP-Adressen und selbst-signierte Zertifikate
+    tls: {
+      rejectUnauthorized: false, // Akzeptiere selbst-signierte Zertifikate
+      minVersion: 'TLSv1.2'
     }
   };
   
-  // Zusätzliche Optionen für problematische Server
+  // Debug-Ausgabe
   if (process.env.NODE_ENV === 'development') {
-    config.tls = {
-      rejectUnauthorized: false // NUR für Entwicklung!
-    };
+    config.debug = true; // Aktiviere Debug-Ausgabe
+    config.logger = true; // Aktiviere Logger
   }
   
   console.log('[EmailService] Config:', {
     host: config.host,
     port: config.port,
     secure: config.secure,
-    user: config.auth.user
+    user: config.auth.user,
+    tls: config.tls
   });
   
   try {
@@ -87,12 +94,21 @@ const replaceTemplateVariables = (template, variables) => {
   return text;
 };
 
-// Generische E-Mail senden Funktion - VEREINFACHT
+// Generische E-Mail senden Funktion - VERBESSERT
 const sendEmail = async (to, subject, textBody, htmlBody) => {
   console.log('[EmailService] Attempting to send email to:', to);
   
+  // Prüfe ob Email-Service konfiguriert ist
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error('[EmailService] Email service not configured');
+    return { 
+      success: false, 
+      error: 'Email service not configured. Please check EMAIL_HOST, EMAIL_USER and EMAIL_PASS in .env' 
+    };
+  }
+  
   try {
-    const transporter = createTransport();
+    const transporter = createTransporter();
     
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"Event Staff App" <${process.env.EMAIL_USER}>`,
@@ -109,12 +125,31 @@ const sendEmail = async (to, subject, textBody, htmlBody) => {
     });
     
     const info = await transporter.sendMail(mailOptions);
-    console.log('[EmailService] Email sent successfully:', info.messageId);
+    console.log('[EmailService] Email sent successfully:', info);
+    console.log('[EmailService] Message ID:', info.messageId);
+    console.log('[EmailService] Response:', info.response);
     
-    return { success: true, messageId: info.messageId };
+    return { success: true, messageId: info.messageId, response: info.response };
   } catch (error) {
     console.error('[EmailService] Error sending email:', error);
-    return { success: false, error: error.message };
+    console.error('[EmailService] Error code:', error.code);
+    console.error('[EmailService] Error response:', error.response);
+    console.error('[EmailService] Error command:', error.command);
+    
+    // Spezifische Fehlerbehandlung
+    let errorMessage = error.message;
+    
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = 'Verbindung zum Email-Server abgelehnt. Bitte prüfen Sie Host und Port.';
+    } else if (error.code === 'ESOCKET') {
+      errorMessage = 'Socket-Fehler. Möglicherweise ist der Email-Server nicht erreichbar.';
+    } else if (error.code === 'EAUTH') {
+      errorMessage = 'Authentifizierung fehlgeschlagen. Bitte prüfen Sie Benutzername und Passwort.';
+    } else if (error.responseCode === 535) {
+      errorMessage = 'Authentifizierung fehlgeschlagen. Falscher Benutzername oder Passwort.';
+    }
+    
+    return { success: false, error: errorMessage, details: error };
   }
 };
 
@@ -303,22 +338,28 @@ const sendPasswordResetEmail = async (email, firstName, resetToken) => {
   }
 };
 
-// Test E-Mail Konfiguration - VEREINFACHT
+// Test E-Mail Konfiguration - KORRIGIERT
 const testEmailConfiguration = async () => {
   console.log('[EmailService] Testing email configuration...');
   
   try {
-    // Prüfe ob nodemailer geladen ist
-    if (!nodemailer || typeof nodemailer !== 'function') {
+    // Prüfe ob nodemailer geladen ist - KORRIGIERT
+    if (!nodemailer || typeof nodemailer.createTransport !== 'function') {
       throw new Error('Nodemailer ist nicht korrekt geladen');
     }
     
-    const transporter = createTransport();
+    const transporter = createTransporter();
     
     // Verifiziere Transporter
     console.log('[EmailService] Verifying transporter...');
-    await transporter.verify();
-    console.log('[EmailService] Email transporter verified successfully');
+    try {
+      await transporter.verify();
+      console.log('[EmailService] Email transporter verified successfully');
+    } catch (verifyError) {
+      console.error('[EmailService] Transporter verification failed:', verifyError);
+      // Manche SMTP-Server unterstützen VERIFY nicht, versuche trotzdem eine Test-Mail
+      console.log('[EmailService] Trying to send test email despite verification failure...');
+    }
     
     // Sende Test-E-Mail
     const adminEmail = process.env.EMAIL_USER || process.env.ADMIN_EMAIL;
@@ -329,17 +370,27 @@ const testEmailConfiguration = async () => {
       '<p>Dies ist eine <strong>Test-E-Mail</strong>.</p><p>Die E-Mail-Konfiguration funktioniert korrekt.</p>'
     );
     
-    return {
-      success: true,
-      message: 'E-Mail-Konfiguration erfolgreich getestet',
-      result: testResult
-    };
+    if (testResult.success) {
+      return {
+        success: true,
+        message: 'E-Mail-Konfiguration erfolgreich getestet',
+        result: testResult
+      };
+    } else {
+      return {
+        success: false,
+        message: 'E-Mail-Konfiguration fehlgeschlagen',
+        error: testResult.error,
+        details: testResult.details
+      };
+    }
   } catch (error) {
     console.error('[EmailService] Email configuration test failed:', error);
     return {
       success: false,
       message: 'E-Mail-Konfiguration fehlgeschlagen',
-      error: error.message
+      error: error.message,
+      details: error
     };
   }
 };
@@ -400,8 +451,13 @@ const updateEmailTemplate = async (name, updates) => {
 const debugModule = () => {
   console.log('[EmailService] Module debug info:');
   console.log('- nodemailer type:', typeof nodemailer);
-  console.log('- nodemailer keys:', nodemailer ? Object.keys(nodemailer) : 'undefined');
-  console.log('- createTransport type:', nodemailer ? typeof nodemailer.createTransport : 'undefined');
+  console.log('- nodemailer version:', nodemailer.version || 'unknown');
+  console.log('- createTransport exists:', typeof nodemailer?.createTransport);
+  console.log('- Email config:');
+  console.log('  - HOST:', process.env.EMAIL_HOST || 'NOT SET');
+  console.log('  - PORT:', process.env.EMAIL_PORT || 'NOT SET');
+  console.log('  - USER:', process.env.EMAIL_USER || 'NOT SET');
+  console.log('  - PASS:', process.env.EMAIL_PASS ? 'SET' : 'NOT SET');
 };
 
 // Beim Laden des Moduls
