@@ -140,8 +140,9 @@ router.delete('/:id/invite/:staffId',
   handleValidationErrors,
   eventController.removeInvitation
 );
+// Aktualisierte Validierungen für Schichten in eventRoutes.js
 
-// Schichten
+// Schicht hinzufügen - AKTUALISIERT
 router.post('/:id/shifts',
   requireAdmin,
   [
@@ -165,14 +166,39 @@ router.post('/:id/shifts',
     body('required_staff')
       .optional()
       .isInt({ min: 1 }).withMessage('Benötigte Mitarbeiterzahl muss mindestens 1 sein'),
+    body('min_staff')
+      .optional()
+      .isInt({ min: 0 }).withMessage('Minimale Mitarbeiterzahl muss 0 oder größer sein'),
+    body('max_staff')
+      .optional()
+      .isInt({ min: 0 }).withMessage('Maximale Mitarbeiterzahl muss 0 oder größer sein')
+      .custom((value, { req }) => {
+        if (value > 0 && req.body.min_staff && value < req.body.min_staff) {
+          throw new Error('Maximale Mitarbeiterzahl muss größer als minimale sein');
+        }
+        return true;
+      }),
     body('position_id')
       .optional()
-      .isInt().withMessage('Ungültige Positions ID')
+      .isInt().withMessage('Ungültige Positions ID'),
+    body('qualification_ids')
+      .optional()
+      .isArray().withMessage('Qualifikationen müssen als Array übergeben werden')
+      .custom(value => {
+        if (!Array.isArray(value)) return true;
+        return value.every(id => Number.isInteger(parseInt(id)));
+      }).withMessage('Ungültige Qualifikations-IDs'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 }).withMessage('Beschreibung darf maximal 1000 Zeichen lang sein')
   ],
   handleValidationErrors,
   eventController.addShift
 );
 
+
+// Schicht aktualisieren - AKTUALISIERT
 router.put('/:id/shifts/:shiftId',
   requireAdmin,
   [
@@ -189,20 +215,47 @@ router.put('/:id/shifts/:shiftId',
     body('end_time')
       .optional()
       .isISO8601().withMessage('Ungültige Endzeit')
+      .custom((value, { req }) => {
+        if (req.body.start_time) {
+          const start = new Date(req.body.start_time);
+          const end = new Date(value);
+          if (end <= start) {
+            throw new Error('Endzeit muss nach der Startzeit liegen');
+          }
+        }
+        return true;
+      }),
+    body('required_staff')
+      .optional()
+      .isInt({ min: 1 }).withMessage('Benötigte Mitarbeiterzahl muss mindestens 1 sein'),
+    body('min_staff')
+      .optional()
+      .isInt({ min: 0 }).withMessage('Minimale Mitarbeiterzahl muss 0 oder größer sein'),
+    body('max_staff')
+      .optional()
+      .isInt({ min: 0 }).withMessage('Maximale Mitarbeiterzahl muss 0 oder größer sein'),
+    body('position_id')
+      .optional()
+      .custom(isOptionalInt).withMessage('Ungültige Positions ID'),
+    body('qualification_ids')
+      .optional()
+      .isArray().withMessage('Qualifikationen müssen als Array übergeben werden')
+      .custom(value => {
+        if (!Array.isArray(value)) return true;
+        return value.every(id => Number.isInteger(parseInt(id)));
+      }).withMessage('Ungültige Qualifikations-IDs'),
+    body('description')
+      .optional()
+      .trim()
+      .isLength({ max: 1000 }).withMessage('Beschreibung darf maximal 1000 Zeichen lang sein')
   ],
   handleValidationErrors,
   eventController.updateShift
 );
 
-router.delete('/:id/shifts/:shiftId',
-  requireAdmin,
-  [
-    param('id').isInt().withMessage('Ungültige Event ID'),
-    param('shiftId').isInt().withMessage('Ungültige Schicht ID')
-  ],
-  handleValidationErrors,
-  eventController.deleteShift
-);
+
+
+
 
 // Staff Routes
 router.get('/invitations/my', requireStaff, eventController.getMyInvitations);

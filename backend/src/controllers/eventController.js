@@ -692,30 +692,33 @@ const removeInvitation = async (req, res) => {
     connection.release();
   }
 };
+// Fügen Sie diese Funktionen zu Ihrem eventController.js hinzu
 
-// Schicht zu Event hinzufügen
+// Schicht hinzufügen - AKTUALISIERT
 const addShift = async (req, res) => {
   const connection = await db.getConnection();
   
   try {
     await connection.beginTransaction();
     
-    const { id } = req.params;
-    const {
-      name,
-      start_time,
-      end_time,
-      required_staff,
-      position_id,
-      description
+    const { id: eventId } = req.params;
+    const { 
+      name, 
+      start_time, 
+      end_time, 
+      required_staff, 
+      min_staff,
+      max_staff,
+      position_id, 
+      description,
+      qualification_ids = [] // Neue Qualifikations-IDs
     } = req.body;
-    
     const adminId = req.user.id;
     
     // Prüfe ob Event existiert
     const [events] = await connection.execute(
-      'SELECT name FROM events WHERE id = ?',
-      [id]
+      'SELECT id, name FROM events WHERE id = ?',
+      [eventId]
     );
     
     if (events.length === 0) {
@@ -729,18 +732,29 @@ const addShift = async (req, res) => {
     const [result] = await connection.execute(
       `INSERT INTO shifts (
         event_id, name, start_time, end_time, 
-        required_staff, position_id, description
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        required_staff, min_staff, max_staff, 
+        position_id, description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id,
-        name,
-        start_time,
-        end_time,
-        required_staff || 1,
-        position_id || null,
+        eventId, name, start_time, end_time, 
+        required_staff || 1, 
+        min_staff || 0,
+        max_staff || 0,
+        position_id || null, 
         description || null
       ]
     );
+    
+    const shiftId = result.insertId;
+    
+    // Füge Qualifikationen hinzu
+    if (qualification_ids.length > 0) {
+      const qualificationValues = qualification_ids.map(qId => [shiftId, qId]);
+      await connection.query(
+        'INSERT INTO shift_qualifications (shift_id, qualification_id) VALUES ?',
+        [qualificationValues]
+      );
+    }
     
     // Aktivitätslog
     await connection.execute(
@@ -748,11 +762,11 @@ const addShift = async (req, res) => {
        VALUES (?, 'shift_created', 'shift', ?, ?)`,
       [
         adminId,
-        result.insertId,
+        shiftId,
         JSON.stringify({
           eventName: events[0].name,
           shiftName: name,
-          requiredStaff: required_staff
+          qualificationCount: qualification_ids.length
         })
       ]
     );
@@ -761,7 +775,7 @@ const addShift = async (req, res) => {
     
     res.status(201).json({
       message: 'Schicht erfolgreich erstellt',
-      shiftId: result.insertId
+      shiftId
     });
     
   } catch (error) {
@@ -775,21 +789,21 @@ const addShift = async (req, res) => {
   }
 };
 
-// Schicht aktualisieren
+// Schicht aktualisieren - AKTUALISIERT
 const updateShift = async (req, res) => {
   const connection = await db.getConnection();
   
   try {
     await connection.beginTransaction();
     
-    const { id, shiftId } = req.params;
+    const { id: eventId, shiftId } = req.params;
     const updates = req.body;
     const adminId = req.user.id;
     
-    // Prüfe ob Schicht zu Event gehört
+    // Prüfe ob Schicht zum Event gehört
     const [shifts] = await connection.execute(
-      'SELECT * FROM shifts WHERE id = ? AND event_id = ?',
-      [shiftId, id]
+      'SELECT id, name FROM shifts WHERE id = ? AND event_id = ?',
+      [shiftId, eventId]
     );
     
     if (shifts.length === 0) {
@@ -799,14 +813,15 @@ const updateShift = async (req, res) => {
       });
     }
     
-    // Update Schicht
-    const allowedFields = [
-      'name', 'start_time', 'end_time', 
-      'required_staff', 'position_id', 'description'
-    ];
-    
+    // Update Schicht-Grunddaten
     const updateFields = [];
     const updateParams = [];
+    
+    const allowedFields = [
+      'name', 'start_time', 'end_time', 
+      'required_staff', 'min_staff', 'max_staff',
+      'position_id', 'description'
+    ];
     
     allowedFields.forEach(field => {
       if (updates[field] !== undefined) {
@@ -823,6 +838,24 @@ const updateShift = async (req, res) => {
       );
     }
     
+    // Update Qualifikationen wenn vorhanden
+    if (updates.qualification_ids && Array.isArray(updates.qualification_ids)) {
+      // Lösche alte Qualifikationen
+      await connection.execute(
+        'DELETE FROM shift_qualifications WHERE shift_id = ?',
+        [shiftId]
+      );
+      
+      // Füge neue Qualifikationen hinzu
+      if (updates.qualification_ids.length > 0) {
+        const qualificationValues = updates.qualification_ids.map(qId => [shiftId, qId]);
+        await connection.query(
+          'INSERT INTO shift_qualifications (shift_id, qualification_id) VALUES ?',
+          [qualificationValues]
+        );
+      }
+    }
+    
     // Aktivitätslog
     await connection.execute(
       `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, details)
@@ -831,7 +864,7 @@ const updateShift = async (req, res) => {
         adminId,
         shiftId,
         JSON.stringify({
-          shiftName: updates.name || shifts[0].name,
+          shiftName: shifts[0].name,
           updatedFields: Object.keys(updates)
         })
       ]
@@ -853,6 +886,106 @@ const updateShift = async (req, res) => {
     connection.release();
   }
 };
+
+
+// Erweiterte Event-Detail Funktion mit Schicht-Qualifikationen
+const getEventById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Hole Event-Details
+    const [events] = await db.execute(
+      `SELECT e.*, u.email as creator_email, 
+              CONCAT(sp.first_name, ' ', sp.last_name) as creator_name
+       FROM events e
+       JOIN users u ON e.created_by = u.id
+       LEFT JOIN staff_profiles sp ON u.id = sp.user_id
+       WHERE e.id = ?`,
+      [id]
+    );
+    
+    if (events.length === 0) {
+      return res.status(404).json({ 
+        message: 'Veranstaltung nicht gefunden' 
+      });
+    }
+    
+    const event = events[0];
+    
+    // Hole Schichten mit Qualifikationen
+    const [shifts] = await db.execute(`
+      SELECT 
+        s.*,
+        p.name as position_name,
+        GROUP_CONCAT(DISTINCT q.id) as qualification_ids,
+        GROUP_CONCAT(DISTINCT q.name ORDER BY q.name SEPARATOR ', ') as required_qualifications,
+        COUNT(DISTINCT sa.staff_id) as assigned_count,
+        COUNT(DISTINCT sapp.staff_id) as applicant_count
+      FROM shifts s
+      LEFT JOIN positions p ON s.position_id = p.id
+      LEFT JOIN shift_qualifications sq ON s.id = sq.shift_id
+      LEFT JOIN qualifications q ON sq.qualification_id = q.id
+      LEFT JOIN shift_assignments sa ON s.id = sa.shift_id AND sa.status != 'cancelled'
+      LEFT JOIN shift_applications sapp ON s.id = sapp.shift_id AND sapp.status = 'pending'
+      WHERE s.event_id = ?
+      GROUP BY s.id
+      ORDER BY s.start_time
+    `, [id]);
+    
+    // Parse qualification_ids zurück zu Array
+    shifts.forEach(shift => {
+      shift.qualification_ids = shift.qualification_ids 
+        ? shift.qualification_ids.split(',').map(id => parseInt(id))
+        : [];
+    });
+    
+    // Hole Einladungen
+    const [invitations] = await db.execute(`
+      SELECT 
+        ei.*,
+        sp.id as staff_id,
+        CONCAT(sp.first_name, ' ', sp.last_name) as staff_name,
+        sp.personal_code,
+        sp.profile_image,
+        u.email as staff_email
+      FROM event_invitations ei
+      JOIN staff_profiles sp ON ei.staff_id = sp.id
+      JOIN users u ON sp.user_id = u.id
+      WHERE ei.event_id = ?
+      ORDER BY ei.invited_at DESC
+    `, [id]);
+    
+    // Hole Event-Statistiken
+    const [stats] = await db.execute(`
+      SELECT 
+        COUNT(DISTINCT s.id) as total_shifts,
+        COALESCE(SUM(s.required_staff), 0) as total_positions_needed,
+        COUNT(DISTINCT ei.staff_id) as invited_staff,
+        COUNT(DISTINCT CASE WHEN ei.status = 'accepted' THEN ei.staff_id END) as accepted_invitations,
+        COUNT(DISTINCT sa.staff_id) as assigned_staff,
+        COUNT(DISTINCT CASE WHEN sa.status = 'confirmed' THEN sa.staff_id END) as confirmed_staff
+      FROM events e
+      LEFT JOIN shifts s ON e.id = s.event_id
+      LEFT JOIN event_invitations ei ON e.id = ei.event_id
+      LEFT JOIN shift_assignments sa ON s.id = sa.shift_id
+      WHERE e.id = ?
+    `, [id]);
+    
+    res.json({
+      ...event,
+      shifts,
+      invitations,
+      stats: stats[0]
+    });
+    
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Veranstaltung:', error);
+    res.status(500).json({ 
+      message: 'Fehler beim Abrufen der Veranstaltung' 
+    });
+  }
+};
+
 
 // Schicht löschen
 const deleteShift = async (req, res) => {

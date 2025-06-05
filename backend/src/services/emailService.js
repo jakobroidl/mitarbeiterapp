@@ -11,32 +11,21 @@ try {
   throw new Error('Nodemailer konnte nicht geladen werden');
 }
 
-// E-Mail Transporter erstellen - KORRIGIERT
 const createTransporter = () => {
   console.log('[EmailService] Creating email transporter...');
   
-  // Prüfe ob nodemailer vorhanden ist - KORRIGIERT
-  if (!nodemailer || typeof nodemailer.createTransport !== 'function') {
-    console.error('[EmailService] Nodemailer not properly loaded');
-    console.error('[EmailService] nodemailer type:', typeof nodemailer);
-    console.error('[EmailService] nodemailer keys:', nodemailer ? Object.keys(nodemailer) : 'undefined');
-    throw new Error('Nodemailer ist nicht korrekt geladen');
+  // Gmail-spezifische Konfiguration
+  if (process.env.EMAIL_HOST === 'smtp.gmail.com') {
+    console.log('[EmailService] Using Gmail configuration');
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
   }
-  
-  const config = {
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: process.env.EMAIL_PORT === '465', // true für 465, false für andere
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    // Wichtig für IP-Adressen und selbst-signierte Zertifikate
-    tls: {
-      rejectUnauthorized: false, // Akzeptiere selbst-signierte Zertifikate
-      minVersion: 'TLSv1.2'
-    }
-  };
+
   
   // Debug-Ausgabe
   if (process.env.NODE_ENV === 'development') {
