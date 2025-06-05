@@ -218,9 +218,9 @@ const ShiftPlanning = () => {
     }
   };
 
-  // Filter verfügbare Mitarbeiter
+// Filter verfügbare Mitarbeiter
   const getFilteredAvailableStaff = () => {
-    if (!shiftPlan) return [];
+    if (!shiftPlan || !shiftPlan.availableStaff) return [];
     
     return shiftPlan.availableStaff.filter(staff => {
       // Qualifikationsfilter
@@ -250,6 +250,8 @@ const ShiftPlanning = () => {
       return true;
     });
   };
+
+
 
   const getAssignmentStatusColor = (assignment) => {
     switch (assignment.status) {

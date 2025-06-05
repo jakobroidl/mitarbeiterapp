@@ -380,6 +380,28 @@ const getEventShiftPlan = async (req, res) => {
       GROUP BY sapp.id
     `, [eventId]);
     
+    // Hole verfügbare Mitarbeiter (die zur Veranstaltung eingeladen wurden)
+    const [availableStaff] = await db.execute(`
+      SELECT 
+        sp.id,
+        CONCAT(sp.first_name, ' ', sp.last_name) as name,
+        sp.personal_code,
+        sp.profile_image,
+        u.email,
+        GROUP_CONCAT(DISTINCT q.name ORDER BY q.name SEPARATOR ', ') as qualifications,
+        GROUP_CONCAT(DISTINCT q.id) as qualification_ids
+      FROM event_invitations ei
+      JOIN staff_profiles sp ON ei.staff_id = sp.id
+      JOIN users u ON sp.user_id = u.id
+      LEFT JOIN staff_qualifications sq ON sp.id = sq.staff_id
+      LEFT JOIN qualifications q ON sq.qualification_id = q.id
+      WHERE ei.event_id = ? 
+        AND ei.status = 'accepted'
+        AND u.is_active = 1
+      GROUP BY sp.id
+      ORDER BY sp.last_name, sp.first_name
+    `, [eventId]);
+    
     // Strukturiere Daten
     const shiftPlan = await Promise.all(shifts.map(async (shift) => {
       const shiftAssignments = assignments.filter(a => a.shift_id === shift.id);
@@ -426,11 +448,13 @@ const getEventShiftPlan = async (req, res) => {
     res.json({
       shifts: shiftPlan,
       shiftsByDate,
+      availableStaff, // Jetzt enthalten!
       stats: {
         totalShifts: shiftPlan.length,
         totalPositionsNeeded: shiftPlan.reduce((sum, s) => sum + s.required_staff, 0),
         totalAssigned: shiftPlan.reduce((sum, s) => sum + s.coverage.assigned, 0),
-        totalApplications: applications.length
+        totalApplications: applications.length,
+        availableStaffCount: availableStaff.length
       }
     });
     
@@ -441,6 +465,7 @@ const getEventShiftPlan = async (req, res) => {
     });
   }
 };
+
 
 // Staff: Für Schicht bewerben - AKTUALISIERT
 const applyForShift = async (req, res) => {
