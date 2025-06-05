@@ -5,7 +5,7 @@ const { body, param } = require('express-validator');
 const timeclockController = require('../controllers/timeclockController');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
-
+const db = require('../config/database'); 
 // Kiosk Routes (ohne Authentifizierung)
 router.post('/kiosk/clock-in',
   [
@@ -58,6 +58,25 @@ router.use(authenticateToken);
 
 // Staff Routes
 router.get('/my', requireStaff, timeclockController.getMyTimeEntries);
+
+
+
+router.get('/report',
+  requireStaff,
+  async (req, res) => {
+    if (req.query.staff_id === 'self') {
+      const [staffResult] = await db.execute(
+        'SELECT id FROM staff_profiles WHERE user_id = ?',
+        [req.user.id]
+      );
+      if (staffResult.length > 0) {
+        req.query.staff_id = staffResult[0].id;
+      }
+    }
+    return timeclockController.exportTimeEntries(req, res);
+  }
+);
+
 
 // Admin Routes
 router.get('/', requireAdmin, timeclockController.getAllTimeEntries);

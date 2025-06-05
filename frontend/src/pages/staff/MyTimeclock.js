@@ -53,35 +53,34 @@ const MyTimeclock = () => {
     }
   };
 
-  const exportMonth = async () => {
-    try {
-      const from = startOfMonth(currentMonth).toISOString();
-      const to = endOfMonth(currentMonth).toISOString();
-      
-      const response = await api.get('/timeclock/report', {
-        params: { 
-          staff_id: 'self', // Backend sollte dies als eigene ID interpretieren
-          month: currentMonth.getMonth() + 1,
-          year: currentMonth.getFullYear()
-        },
-        responseType: 'blob'
-      });
-      
-      // Download erstellen
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `arbeitszeiten_${format(currentMonth, 'yyyy-MM')}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      toast.success('Export erfolgreich heruntergeladen');
-    } catch (error) {
-      console.error('Fehler beim Export:', error);
-      toast.error('Fehler beim Exportieren der Daten');
-    }
-  };
+const exportMonth = async () => {
+  try {
+    const response = await api.get('/timeclock/report', {
+      params: { 
+        staff_id: 'self',
+        from: startOfMonth(currentMonth).toISOString(),
+        to: endOfMonth(currentMonth).toISOString(),
+        format: 'csv'
+      },
+      responseType: 'blob'
+    });
+    
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `arbeitszeiten_${format(currentMonth, 'yyyy-MM')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Export erfolgreich heruntergeladen');
+  } catch (error) {
+    console.error('Fehler beim Export:', error);
+    toast.error('Fehler beim Exportieren der Daten');
+  }
+};
+
 
   const toggleDayExpansion = (date) => {
     setExpandedDays(prev => {

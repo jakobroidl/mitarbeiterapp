@@ -1,8 +1,76 @@
 // backend/src/controllers/timeclockController.js
 const db = require('../config/database');
 const { validationResult } = require('express-validator');
-const { format, differenceInMinutes, startOfDay, endOfDay, startOfMonth, endOfMonth } = require('date-fns');
+const { format, differenceInMinutes, startOfDay, endOfDay, startOfMonth, endOfMonth, parseISO } = require('date-fns');
 const { de } = require('date-fns/locale');
+
+// Hilfsfunktion für Zeitberechnung mit automatischer Pause
+const calculateWorkingTime = async (clockIn, clockOut, manualBreakMinutes = null) => {
+  if (!clockIn || !clockOut) {
+    return {
+      grossMinutes: 0,
+      breakMinutes: 0,
+      netMinutes: 0,
+      grossHours: '0.00',
+      netHours: '0.00'
+    };
+  }
+  
+  const clockInDate = new Date(clockIn);
+  const clockOutDate = new Date(clockOut);
+  
+  // Bruttoarbeitszeit in Minuten
+  const grossMinutes = differenceInMinutes(clockOutDate, clockInDate);
+  
+  let breakMinutes = 0;
+  
+  // Wenn manuelle Pause angegeben, diese verwenden
+  if (manualBreakMinutes !== null && manualBreakMinutes !== undefined) {
+    breakMinutes = parseInt(manualBreakMinutes) || 0;
+  } else {
+    // Automatische Pausenberechnung aus Settings
+    try {
+      const [settings] = await db.execute(
+        `SELECT setting_key, setting_value 
+         FROM settings 
+         WHERE setting_key IN ('auto_break_enabled', 'auto_break_after_hours', 'auto_break_duration', 
+                              'auto_break_after_hours_2', 'auto_break_duration_2')`
+      );
+      
+      const settingsMap = {};
+      settings.forEach(s => settingsMap[s.setting_key] = s.setting_value);
+      
+      const autoBreakEnabled = settingsMap.auto_break_enabled === '1' || settingsMap.auto_break_enabled === 'true';
+      
+      if (autoBreakEnabled) {
+        const threshold1 = parseInt(settingsMap.auto_break_after_hours || '6') * 60;
+        const threshold2 = parseInt(settingsMap.auto_break_after_hours_2 || '9') * 60;
+        const break1 = parseInt(settingsMap.auto_break_duration || '30');
+        const break2 = parseInt(settingsMap.auto_break_duration_2 || '45');
+        
+        if (grossMinutes > threshold2) {
+          breakMinutes = break2;
+        } else if (grossMinutes > threshold1) {
+          breakMinutes = break1;
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Pauseneinstellungen:', error);
+      // Keine automatische Pause bei Fehler
+    }
+  }
+  
+  // Nettoarbeitszeit
+  const netMinutes = Math.max(0, grossMinutes - breakMinutes);
+  
+  return {
+    grossMinutes,
+    breakMinutes,
+    netMinutes,
+    grossHours: (grossMinutes / 60).toFixed(2),
+    netHours: (netMinutes / 60).toFixed(2)
+  };
+};
 
 // Kiosk Clock In
 const kioskClockIn = async (req, res) => {
@@ -16,7 +84,6 @@ const kioskClockIn = async (req, res) => {
     // Optional: Validate kiosk token if configured
     const expectedToken = process.env.KIOSK_TOKEN;
     if (expectedToken && expectedToken !== 'your-secure-kiosk-token-here-change-this') {
-      // Only validate if a real token is configured
       if (kiosk_token !== expectedToken) {
         await connection.rollback();
         return res.status(401).json({ 
@@ -114,7 +181,6 @@ const kioskClockOut = async (req, res) => {
     // Optional: Validate kiosk token if configured
     const expectedToken = process.env.KIOSK_TOKEN;
     if (expectedToken && expectedToken !== 'your-secure-kiosk-token-here-change-this') {
-      // Only validate if a real token is configured
       if (kiosk_token !== expectedToken) {
         await connection.rollback();
         return res.status(401).json({ 
@@ -123,15 +189,12 @@ const kioskClockOut = async (req, res) => {
       }
     }
     
-
-
-
     // Hole Mitarbeiter
     const [staff] = await connection.execute(
       `SELECT sp.id, sp.first_name, sp.last_name
        FROM staff_profiles sp
        WHERE sp.personal_code = ?`,
-      [personal_code]
+      [personal_code.toUpperCase()]
     );
     
     if (staff.length === 0) {
@@ -167,32 +230,19 @@ const kioskClockOut = async (req, res) => {
     const entry = activeEntries[0];
     const clockIn = new Date(entry.clock_in);
     const clockOut = new Date();
-    const totalMinutes = differenceInMinutes(clockOut, clockIn);
     
-    // Prüfe auf automatische Pause
-    const [pauseSettings] = await connection.execute(
-      'SELECT setting_value FROM settings WHERE setting_key = "auto_break_minutes"',
-      []
-    );
-    
-    let breakMinutes = 0;
-    const autoBreakThreshold = pauseSettings.length ? parseInt(pauseSettings[0].setting_value) : 360; // 6 Stunden
-    
-    if (totalMinutes > autoBreakThreshold) {
-      breakMinutes = 30; // 30 Minuten Pause
-    }
-    
-    const netMinutes = totalMinutes - breakMinutes;
+    // Berechne Arbeitszeit
+    const timeCalc = await calculateWorkingTime(clockIn, clockOut);
     
     // Update Eintrag
     await connection.execute(
       `UPDATE timeclock_entries 
-       SET clock_out = NOW(), 
+       SET clock_out = ?, 
            break_minutes = ?, 
            total_minutes = ?,
            status = 'completed'
        WHERE id = ?`,
-      [breakMinutes, netMinutes, entry.id]
+      [clockOut, timeCalc.breakMinutes, timeCalc.netMinutes, entry.id]
     );
     
     // Aktivitätslog
@@ -204,16 +254,19 @@ const kioskClockOut = async (req, res) => {
         JSON.stringify({
           staffId,
           staffName,
-          totalHours: (netMinutes / 60).toFixed(2),
-          breakMinutes
+          grossHours: timeCalc.grossHours,
+          netHours: timeCalc.netHours,
+          breakMinutes: timeCalc.breakMinutes,
+          clockIn: clockIn.toISOString(),
+          clockOut: clockOut.toISOString()
         })
       ]
     );
     
     await connection.commit();
     
-    const hours = Math.floor(netMinutes / 60);
-    const minutes = netMinutes % 60;
+    const hours = Math.floor(timeCalc.netMinutes / 60);
+    const minutes = timeCalc.netMinutes % 60;
     
     res.json({
       success: true,
@@ -221,8 +274,11 @@ const kioskClockOut = async (req, res) => {
       summary: {
         clock_in: clockIn,
         clock_out: clockOut,
-        total_hours: (netMinutes / 60).toFixed(2),
-        break_minutes: breakMinutes,
+        gross_minutes: timeCalc.grossMinutes,
+        gross_hours: timeCalc.grossHours,
+        break_minutes: timeCalc.breakMinutes,
+        net_minutes: timeCalc.netMinutes,
+        net_hours: timeCalc.netHours,
         position: entry.position_name,
         event: entry.event_name
       }
@@ -250,7 +306,7 @@ const checkClockStatus = async (req, res) => {
        FROM staff_profiles sp
        JOIN users u ON sp.user_id = u.id
        WHERE sp.personal_code = ? AND u.is_active = 1`,
-      [personal_code]
+      [personal_code.toUpperCase()]
     );
     
     if (staff.length === 0) {
@@ -417,13 +473,19 @@ const updateTimeEntry = async (req, res) => {
     
     const entry = entries[0];
     
+    // Neue Zeiten für Berechnung
+    const newClockIn = clock_in ? new Date(clock_in) : new Date(entry.clock_in);
+    const newClockOut = clock_out ? new Date(clock_out) : (entry.clock_out ? new Date(entry.clock_out) : null);
+    
     // Berechne neue Gesamtzeit
     let totalMinutes = entry.total_minutes;
-    if (clock_in && clock_out) {
-      const newClockIn = new Date(clock_in);
-      const newClockOut = new Date(clock_out);
-      const grossMinutes = differenceInMinutes(newClockOut, newClockIn);
-      totalMinutes = grossMinutes - (break_minutes || 0);
+    if (newClockOut) {
+      const timeCalc = await calculateWorkingTime(
+        newClockIn, 
+        newClockOut, 
+        break_minutes !== undefined ? break_minutes : entry.break_minutes
+      );
+      totalMinutes = timeCalc.netMinutes;
     }
     
     // Update
@@ -453,6 +515,12 @@ const updateTimeEntry = async (req, res) => {
     updates.push('total_minutes = ?');
     updateParams.push(totalMinutes);
     
+    // Wenn clock_out gesetzt wird, Status auf 'completed' setzen
+    if (clock_out && entry.status === 'active') {
+      updates.push('status = ?');
+      updateParams.push('completed');
+    }
+    
     updateParams.push(id);
     
     await connection.execute(
@@ -472,7 +540,14 @@ const updateTimeEntry = async (req, res) => {
           oldValues: {
             clock_in: entry.clock_in,
             clock_out: entry.clock_out,
-            break_minutes: entry.break_minutes
+            break_minutes: entry.break_minutes,
+            total_minutes: entry.total_minutes
+          },
+          newValues: {
+            clock_in: clock_in || entry.clock_in,
+            clock_out: clock_out || entry.clock_out,
+            break_minutes: break_minutes !== undefined ? break_minutes : entry.break_minutes,
+            total_minutes: totalMinutes
           }
         })
       ]
@@ -782,8 +857,9 @@ const manualClockEntry = async (req, res) => {
       event_id,
       clock_in,
       clock_out,
-      break_minutes = 0,
-      notes
+      break_minutes = null,
+      notes,
+      disable_auto_break = false
     } = req.body;
     
     const adminId = req.user.id;
@@ -801,11 +877,20 @@ const manualClockEntry = async (req, res) => {
     
     // Berechne Gesamtzeit
     let totalMinutes = null;
+    let finalBreakMinutes = 0;
     let status = 'active';
+    let timeCalc = null;
     
     if (clockOutDate) {
-      const grossMinutes = differenceInMinutes(clockOutDate, clockInDate);
-      totalMinutes = grossMinutes - break_minutes;
+      // Berechne mit automatischer Pause wenn nicht deaktiviert
+      timeCalc = await calculateWorkingTime(
+        clockInDate, 
+        clockOutDate, 
+        disable_auto_break ? 0 : break_minutes
+      );
+      
+      totalMinutes = timeCalc.netMinutes;
+      finalBreakMinutes = timeCalc.breakMinutes;
       status = 'completed';
     }
     
@@ -821,7 +906,7 @@ const manualClockEntry = async (req, res) => {
         position_id,
         clockInDate,
         clockOutDate,
-        break_minutes,
+        finalBreakMinutes,
         totalMinutes,
         status,
         notes || null
@@ -845,7 +930,9 @@ const manualClockEntry = async (req, res) => {
           staffName: `${staff[0].first_name} ${staff[0].last_name}`,
           clockIn: clock_in,
           clockOut: clock_out,
-          totalHours: totalMinutes ? (totalMinutes / 60).toFixed(2) : null
+          grossHours: timeCalc ? timeCalc.grossHours : null,
+          netHours: timeCalc ? timeCalc.netHours : null,
+          breakMinutes: finalBreakMinutes
         })
       ]
     );
@@ -854,7 +941,14 @@ const manualClockEntry = async (req, res) => {
     
     res.status(201).json({
       message: 'Zeiteintrag erfolgreich erstellt',
-      entryId: result.insertId
+      entryId: result.insertId,
+      summary: timeCalc ? {
+        gross_minutes: timeCalc.grossMinutes,
+        break_minutes: timeCalc.breakMinutes,
+        net_minutes: timeCalc.netMinutes,
+        gross_hours: timeCalc.grossHours,
+        net_hours: timeCalc.netHours
+      } : null
     });
     
   } catch (error) {
@@ -868,6 +962,7 @@ const manualClockEntry = async (req, res) => {
   }
 };
 
+// Export von Zeiteinträgen
 const exportTimeEntries = async (req, res) => {
   try {
     const { 
@@ -875,7 +970,7 @@ const exportTimeEntries = async (req, res) => {
       event_id,
       from,
       to,
-      format = 'csv'
+      format: exportFormat = 'csv'
     } = req.query;
     
     let query = `
@@ -897,9 +992,19 @@ const exportTimeEntries = async (req, res) => {
     
     const params = [];
     
-    if (staff_id) {
+    if (staff_id && staff_id !== 'self') {
       query += ' AND te.staff_id = ?';
       params.push(staff_id);
+    } else if (staff_id === 'self' && req.user) {
+      // Für Staff-User: Eigene Daten
+      const [staffResult] = await db.execute(
+        'SELECT id FROM staff_profiles WHERE user_id = ?',
+        [req.user.id]
+      );
+      if (staffResult.length > 0) {
+        query += ' AND te.staff_id = ?';
+        params.push(staffResult[0].id);
+      }
     }
     
     if (event_id) {
@@ -921,31 +1026,38 @@ const exportTimeEntries = async (req, res) => {
     
     const [entries] = await db.execute(query, params);
     
-    if (format === 'csv') {
+    if (exportFormat === 'csv') {
       // CSV Format
-      let csv = 'Mitarbeiter,Personal-Code,Datum,Einstempelzeit,Ausstempelzeit,Dauer (Minuten),Pause (Minuten),Position,Veranstaltung\n';
+      let csv = 'Mitarbeiter,Personal-Code,Datum,Einstempelzeit,Ausstempelzeit,Brutto (Minuten),Pause (Minuten),Netto (Minuten),Position,Veranstaltung,Notizen\n';
       
-      entries.forEach(entry => {
-        const date = format(new Date(entry.clock_in), 'dd.MM.yyyy');
-        const clockIn = format(new Date(entry.clock_in), 'HH:mm');
-        const clockOut = entry.clock_out ? format(new Date(entry.clock_out), 'HH:mm') : '';
+      for (const entry of entries) {
+        const dateStr = format(new Date(entry.clock_in), 'dd.MM.yyyy');
+        const clockInTime = format(new Date(entry.clock_in), 'HH:mm');
+        const clockOutTime = entry.clock_out ? format(new Date(entry.clock_out), 'HH:mm') : '';
+        
+        // Berechne Bruttozeit
+        let grossMinutes = 0;
+        if (entry.clock_out) {
+          grossMinutes = differenceInMinutes(new Date(entry.clock_out), new Date(entry.clock_in));
+        }
         
         csv += `"${entry.first_name} ${entry.last_name}",`;
         csv += `"${entry.personal_code}",`;
-        csv += `"${date}",`;
-        csv += `"${clockIn}",`;
-        csv += `"${clockOut}",`;
-        csv += `"${entry.total_minutes || 0}",`;
+        csv += `"${dateStr}",`;
+        csv += `"${clockInTime}",`;
+        csv += `"${clockOutTime}",`;
+        csv += `"${grossMinutes}",`;
         csv += `"${entry.break_minutes || 0}",`;
+        csv += `"${entry.total_minutes || 0}",`;
         csv += `"${entry.position_name || ''}",`;
-        csv += `"${entry.event_name || ''}"\n`;
-      });
+        csv += `"${entry.event_name || ''}",`;
+        csv += `"${entry.notes || ''}"\n`;
+      }
       
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename=stempeluhr_${from}_${to}.csv`);
+      res.setHeader('Content-Disposition', `attachment; filename=arbeitszeiten_${from || 'alle'}_${to || 'alle'}.csv`);
       res.send('\ufeff' + csv); // UTF-8 BOM für Excel
     } else {
-      // Excel format würde hier implementiert werden
       res.status(501).json({ message: 'Excel Export noch nicht implementiert' });
     }
     
@@ -956,7 +1068,6 @@ const exportTimeEntries = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   // Kiosk Mode
@@ -970,7 +1081,7 @@ module.exports = {
   deleteTimeEntry,
   generateTimeReport,
   manualClockEntry,
-  exportTimeEntries, // NEU
+  exportTimeEntries,
   
   // Staff
   getMyTimeEntries,
@@ -978,4 +1089,5 @@ module.exports = {
   // Shared
   getAvailablePositions
 };
+
 
